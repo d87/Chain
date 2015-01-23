@@ -61,3 +61,8 @@ def taskjson(task_id):
 def shutdown_session(exception=None):
     db_session.remove()
 
+
+
+if __name__ == '__main__':
+    app.debug = True
+    app.run(host='0.0.0.0', threaded=True)
