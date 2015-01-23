@@ -1,0 +1,487 @@
+{% extends 'base.html' %}
+{% block title %}Wheel of Pain{% endblock %}
+
+{% block head %}
+<script>
+$(function() {
+
+    var Tasks = []
+
+    $(".task").each( function(index){
+
+        var idattr = $(this).attr('id')
+        var id = parseInt(idattr.match(/\d+/)[0])
+        this.taskId = id
+        var task = this
+
+        task.pomoTime = 0
+        task.pomoLength = 25
+        // task.taskStartTime = 0
+
+        if (id) Tasks.push(this);
+
+
+        // var pbDiv = $("<div></div>", { id: "progressbar"+id }) //createElement with attributes
+        // pbDiv.appendTo(this) // append to #taskN
+        var pbDiv = $(this).find('.progressbar')
+        var progress = new ProgressBar.Line(pbDiv[0], {
+            color: '#FCB03C',
+            strokeWidth: 6.7,
+            trailColor: "#151515",
+        });
+        this.progress = progress
+        this.normalTimer = new MiniDaemon(this, function(){
+            this._update()
+        },50, Infinity)
+
+
+        var clockDiv = $(this).find('.clock')
+        var clock = new ProgressBar.Circle(clockDiv[0], {
+            color: "#33FF33",
+            // fill: '#000',
+            strokeWidth: 7,
+            trailWidth: 1,
+            trailColor: "#151515",
+        });
+        var clockText = $("<span></span>")
+        clockText.appendTo(clockDiv)
+        clockText.text("0")
+        clock.text = clockText
+        this.clock = clock
+        this.clockDiv = clockDiv
+
+        this.clock.hide = function(){
+            clockDiv.css("display", "none")
+        }
+        this.clock.hide()
+
+
+        this.clock.fadeTimer = new MiniDaemon(this.clock, function(){
+            this.hide()
+            this.fadeTimer.pause()
+        }, 5000, Infinity);
+        this.clock.show = function() {
+            this.fadeTimer.pause()
+            clockDiv.css("display", "inline-block")
+        }
+
+
+
+        function componentToHex(c) {
+            var hex = c.toString(16);
+            return hex.length == 1 ? "0" + hex : hex;
+        }
+
+        function rgbToHex(r, g, b) {
+            return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+        }
+        var mulColor = function (hex, mul) {
+            // hex to rgb
+            var bigint = parseInt(hex, 16);
+            // console.log(bigint)
+            var r = (bigint >> 16) & 255;
+            var g = (bigint >> 8) & 255;
+            var b = bigint & 255;
+
+            r = parseInt(r*mul);
+            g = parseInt(g*mul);
+            b = parseInt(b*mul);
+
+            return rgbToHex(r,g,b)
+        }
+        var genColor = function(hex){
+            return ["#"+hex, mulColor(hex,0.4)]
+        }
+
+
+        this.progress.setColor = function(color){
+            this.path.setAttribute('stroke', color[0]);
+            this.trail.setAttribute('stroke', color[1]);
+        }
+
+
+        this.clock.setColor = function(color){
+            this.path.setAttribute('stroke', color[0]);
+            this.trail.setAttribute('stroke', "#222222");
+        }
+
+
+
+
+        var colors = {
+            break: genColor("8888FF"),
+            active: genColor("33BB33"),
+            inactive: genColor("995555"),
+            complete: genColor("009900"),
+            inprogress: genColor("d16a1e")
+        }
+        this.progress.setColor(colors.inactive)
+
+        var audioElement = document.createElement('audio');
+        audioElement.setAttribute('src', '/static/RadioStartFaded.wav');
+        audioElement.volume = 0.2
+
+        this.pomoTimer = new MiniDaemon(this, function(){
+            this._updatePomo()
+        },50, Infinity)
+
+
+        this._update = function(bNoSync, bAnimate){
+
+            var now = Date.now()
+            var elapsed = (now - this.taskStartTime ) / 1000
+            if (bNoSync) elapsed = 0;
+            var p = (elapsed + this.taskTime) / this.taskLength
+            var remains = this.taskLength - elapsed
+            if (remains <= 0) remains = 0;
+            if (p>=1) {
+                p = 1;
+                this.normalTimer.pause()
+                if (!bNoSync) this.updateServer("add_time", (this.taskLength - this.taskTime).toFixed(0) );
+                this.progress.setColor(colors.complete)
+            } else if (elapsed > this.taskSyncPeriod) {
+                if (!bNoSync) {
+                    this.updateServer("add_time", this.taskSyncPeriod);
+                    // if server is not available should for for the next period and not spam
+                    this.taskStartTime = this.taskStartTime + this.taskSyncPeriod*1000
+                }
+                this.progress.setColor(colors.inprogress)
+            }
+            
+
+            if (bAnimate) {
+                this.progress.animate(p)
+            } else {
+                this.progress.set(p)
+            }
+
+        }
+
+
+        var formatTime = function(s){
+            if (s >= 3600) {
+                return Math.ceil(s / 3600)+"h"
+            } else if (s >= 60) {
+                return Math.ceil(s / 60)+"m"
+            } else if (s >= 10) {
+                return Math.floor(s)+"s"
+            }
+            return s.toFixed(1)
+        }
+
+        this._updatePomo = function(){
+            var now = Date.now()
+            var elapsed = (now - this.pomoStartTime ) / 1000
+            var p = elapsed / this.pomoDuration
+            var remains = this.pomoDuration - elapsed
+            if (remains <= 0) remains = 0;
+
+
+            var rmins = Math.ceil(remains/60)
+            if ((rmins % 5 == 0) && (rmins != this._prevSoundTime) && elapsed > 60){
+                if (rmins == 0) {
+                    audioElement.setAttribute('src', '/static/FishBite.wav');
+                    audioElement.volume = 0.2
+                } else {
+                    audioElement.setAttribute('src', '/static/train.wav');
+                    audioElement.volume = 0.3
+                }
+                
+                audioElement.play()
+                this._prevSoundTime = rmins
+            }
+            // console.log((now - this.pomoStartTime ), this.pomoDuration)
+            if (p>=1) {
+                p = 1
+                elapsed = this.pomoDuration
+                this.pomoTimer.pause()
+                if (this.pomoState == "BREAK" || this.pomoState == "LONGBREAK"){
+                    this.stop_break()
+                } else if (this.pomoState == "ACTIVE") {
+                    this.updateServer("add_time", this.pomoLength)
+                    this.taskTime = this.taskTime + this.pomoLength
+                    this._update(true, true)
+                    this.start_break()
+                }
+            }
+
+            this.clock.set(p)
+
+            if (remains <= 0) {
+                this.clock.text.text("")
+            } else {
+                this.clock.text.text(formatTime(remains))
+            }
+        }
+
+        this.start_pomo = function(){
+            if (this.pomoState != "ACTIVE"){
+                this.taskState = "POMO"
+                this.pomoState = "ACTIVE"
+
+                this.pomoStartTime = Date.now()
+                // this.pomoEndTime = pomoStartTime + this.pomoLength
+                this.pomoDuration = this.pomoLength
+
+                this.clock.setColor(colors.active);
+                this.progress.setColor(colors.inprogress);
+                this._update(true)
+                this._updatePomo()
+                this.clock.show()
+                this.normalTimer.pause()
+                this.pomoTimer.start()
+            }
+        }
+
+
+        this.start_task = function(){
+            if (this.taskState != "ACTIVE"){
+                this.taskState = "ACTIVE"
+                this.clock.hide()
+
+                this.taskStartTime = Date.now()
+                this.taskLastSync = Date.now()
+                this.taskSyncPeriod = 1*60
+
+                this.progress.setColor(colors.inprogress)
+
+                this._update()
+                this.normalTimer.start()
+                this.pomoTimer.pause()
+            }
+        }
+
+
+        this.start_break = function(){
+            this.taskState = "INACTIVE"
+            // this.taskTime += this.pomoLength
+            this.progress.setColor(colors.inactive)
+
+            // if this.taskTime >= this.taskLength:
+            //     this.taskTime = this.taskLength
+            //     this.taskState = "COMPLETED"
+
+            this.pomoStartTime = Date.now()
+            this.pomoDuration = this.pomoBreakLength
+            this.pomoCompleted += 1
+            this.pomoState = "BREAK"
+
+            this.clock.setColor(colors.break);
+            // this._update(true)
+            this._updatePomo()
+            this.pomoTimer.start()
+        }
+
+
+        this.stop_break = function(){
+            this.pomoTime = this.pomoDuration
+            this.pomoState= "INACTIVE"
+
+            this._update()
+            this._updatePomo()
+            this.pomoTimer.pause()
+            this.clock.fadeTimer.start()
+        }
+
+        this.reset = function(){
+            task.updateServer("reset")
+            this.pomoTimer.pause()
+            this.normalTimer.pause()
+            this.clock.hide()
+
+            this.taskTime = 0
+            this.taskStartTime = Date.now()
+            this.taskState = "INACTIVE"
+            this.pomoTime = 0
+            this.pomoState = "INACTIVE"
+            this.pomoCompleted = 0
+            this.progress.setColor(colors.inactive)
+
+            this._update(true)
+            this._updatePomo()            
+        }
+        
+
+        $(this).find(".start").click(function(){
+            task.start_task()
+        });
+
+        $(this).find(".reset").click(function(){
+            task.reset()
+        });
+
+        $(this).find(".pomo").click(function(){
+            task.start_pomo()
+        });
+
+
+        this.restore = function(){
+            $(this).find(".title").text(this.title)
+            $(this).find(".duration").text(formatTime(this.taskLength))
+            this._update(true)
+        }
+
+        this.synchronize = function(){
+            var id = this.taskId
+            var task = this
+            $.getJSON("/api/task/"+id+"/")
+                .done(function(data){
+                    console.log(data)
+                    task.title = data.title
+                    task.taskLength = data.task_length
+                    task.taskTime = data.task_time
+                    task.taskState = data.task_state
+                    task.pomoTime = data.pomo_time
+                    task.pomoLength = data.pomo_length
+                    task.pomoBreakLength = data.pomo_break_length
+                    // task.pomoState = data.pomoState
+
+                    task.restore()
+                })
+        }
+        this.synchronize()
+
+
+        this.updateServer = function(cmd, value){
+            var id = this.taskId
+            value = value || 0
+            var task = this
+            $.post("/api/task/"+id+"/", { cmd: cmd, value: value })
+                .done(function(data){
+                    console.log(data)
+                    // var result = data.result
+                    var cmd = data.cmd
+                    var param = data.params
+
+
+                    task.taskLength = data.task_length
+                    task.taskTime = data.task_time
+                    task.taskState = data.task_state
+                    task.pomoTime = data.pomo_time
+                    task.pomoLength = data.pomo_length
+                    task.pomoBreakLength = data.pomo_break_length
+                    // task.pomoState = data.pomoState
+                })
+        }
+    });
+});
+</script>
+<style>
+
+.task > * {
+    display: inline-block;
+    /*font-width: normal;*/
+    /*font-family: "PT Sans Narrow", sans-serif;*/
+}
+
+.task .title {
+    font-weight: 400;
+    font-size: 25px;
+    font-family: "Roboto Condensed", sans-serif;
+}
+.task .duration {
+    margin-left: 20px;
+    font-size: 15px;
+    font-family: "PT Sans Narrow", sans-serif;
+}
+
+.task .clock {
+    position:relative;
+    left: 50px;
+    /*top: 20px;*/
+    width: 130px;
+    height: 130px;
+}
+
+.task .clock span{
+    position: absolute;
+    /*This works because position: absolute means something
+    like "use top, right, bottom, left to position yourself in relation to the nearest ancestor
+    who has position: absolute or position: relative*/
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 30px;
+    font-width: 100;
+    font-family: "PT Sans Narrow", sans-serif;
+    /*transform: translate(-50%, -50%);*/
+}
+
+.task .progressbar {
+    /*display: inline-block;*/
+    width: 300px;
+    height: 20px;
+    padding: 10px 10px 10px 10px;
+    background-color: #090909;
+    margin: 10px 0 10px 0;
+}
+
+.task .pbcont {
+    vertical-align: top;
+    padding: 10px 10px 10px 10px;
+    margin: 30px 0 0 0;
+}
+
+.task .pbcont a {
+    background-image: url('/static/btns1.png');
+    display: inline-block;
+
+    font-family: "PT Sans Narrow", sans-serif;
+    font-size: 15px;
+    color: #79797a;
+
+    width: 24px;
+    height: 23px;
+    margin: 0 50px 0 0;
+    vertical-align: bottom;
+}
+.task .pbcont a:hover {
+    color: #a7a9ac;
+    text-decoration: none;
+}
+.task .pbcont a:active {
+    color: #e7e8e9;
+    text-decoration: none;
+}
+.task .pbcont a span {
+    padding: 0 0 0 30px;
+    position: relative;
+    top: 5px;
+    vertical-align: bottom;
+}
+
+.pomo { background-position: -78px 0px; }
+.pomo:hover { background-position: -78px -23px; }
+.pomo:active { background-position: -78px -46px; }
+
+.start { background-position: -27px 0px; }
+.start:hover { background-position: -27px -23px; }
+.start:active { background-position: -27px -46px; }
+
+.reset { background-position: -1px 0px; }
+.reset:hover { background-position: -1px -23px; }
+.reset:active { background-position: -1px -46px; }
+
+</style>
+{% endblock%}
+
+
+{% block content %}
+
+
+{% for task in tasks %}
+    <div id="task{{ task.id }}" class="task">
+        <div class="pbcont">
+            <div><span class="title">{{task.title}}</span><span class="duration"></span></div>
+            <div class="progressbar"></div>
+            <a src="" class="reset"><span>Reset</span></a>
+            <a src="" class="start"><span>Start</span></a>
+            <a src="" class="pomo"><span>Pomodoro</span></a>
+        </div>
+        <div class="clock">
+        </div>
+    </div>
+{% endfor %}
+
+
+{% endblock %}
