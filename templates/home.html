@@ -1,11 +1,41 @@
 {% extends 'base.html' %}
-{% block title %}Wheel of Pain{% endblock %}
+{% block title %}Whiplash{% endblock %}
 
 {% block head %}
 <script>
 $(function() {
 
     var Tasks = []
+
+    function componentToHex(c) {
+        var hex = c.toString(16);
+        return hex.length == 1 ? "0" + hex : hex;
+    }
+
+    function rgbToHex(r, g, b) {
+        r = parseInt(r)
+        g = parseInt(g)
+        b = parseInt(b)
+        return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+    }
+    var mulColor = function (hex, mul) {
+        // hex to rgb
+        var bigint = parseInt(hex, 16);
+        // console.log(bigint)
+        var r = (bigint >> 16) & 255;
+        var g = (bigint >> 8) & 255;
+        var b = bigint & 255;
+
+        r = parseInt(r*mul);
+        g = parseInt(g*mul);
+        b = parseInt(b*mul);
+
+        return rgbToHex(r,g,b)
+    }
+    var genColor = function(hex){
+        return ["#"+hex, mulColor(hex,0.4)]
+    }
+
 
     $(".task").each( function(index){
 
@@ -50,8 +80,12 @@ $(function() {
         this.clock = clock
         this.clockDiv = clockDiv
 
+        this.clock.show = function() {
+            this.fadeTimer.pause()
+            clockDiv.css("visibility", "visible")
+        }
         this.clock.hide = function(){
-            clockDiv.css("display", "none")
+            clockDiv.css("visibility", "hidden")
         }
         this.clock.hide()
 
@@ -60,38 +94,8 @@ $(function() {
             this.hide()
             this.fadeTimer.pause()
         }, 5000, Infinity);
-        this.clock.show = function() {
-            this.fadeTimer.pause()
-            clockDiv.css("display", "inline-block")
-        }
 
 
-
-        function componentToHex(c) {
-            var hex = c.toString(16);
-            return hex.length == 1 ? "0" + hex : hex;
-        }
-
-        function rgbToHex(r, g, b) {
-            return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
-        }
-        var mulColor = function (hex, mul) {
-            // hex to rgb
-            var bigint = parseInt(hex, 16);
-            // console.log(bigint)
-            var r = (bigint >> 16) & 255;
-            var g = (bigint >> 8) & 255;
-            var b = bigint & 255;
-
-            r = parseInt(r*mul);
-            g = parseInt(g*mul);
-            b = parseInt(b*mul);
-
-            return rgbToHex(r,g,b)
-        }
-        var genColor = function(hex){
-            return ["#"+hex, mulColor(hex,0.4)]
-        }
 
 
         this.progress.setColor = function(color){
@@ -325,8 +329,9 @@ $(function() {
             var id = this.taskId
             var task = this
             $.getJSON("/api/task/"+id+"/")
-                .done(function(data){
-                    console.log(data)
+                .done(function(resp){
+                    console.log(resp)
+                    var data = resp.data
                     task.title = data.title
                     task.taskLength = data.task_length
                     task.taskTime = data.task_time
@@ -347,11 +352,12 @@ $(function() {
             value = value || 0
             var task = this
             $.post("/api/task/"+id+"/", { cmd: cmd, value: value })
-                .done(function(data){
-                    console.log(data)
+                .done(function(resp){
+                    console.log(resp)
+                    var data = resp.data
                     // var result = data.result
-                    var cmd = data.cmd
-                    var param = data.params
+                    // var cmd = data.cmd
+                    // var param = data.params
 
 
                     task.taskLength = data.task_length
@@ -364,6 +370,231 @@ $(function() {
                 })
         }
     });
+
+    var gray = [ 50, 50, 50 ]
+    var yellow = [ 200, 100, 40 ]
+    var red = [ 230, 50, 50 ]
+
+    function GetGradientColor(v){
+        if (v > 1){ v = 1 }
+        var c1,c2
+        if (v < 0.6) {
+            v = v/0.6
+            c1 = gray
+            c2 = yellow
+        } else {
+            v = (v - 0.6)/0.4
+            c1 = yellow
+            c2 = red
+        }
+
+        var r = c1[0] + v*(c2[0]-c1[0])
+        var g = c1[1] + v*(c2[1]-c1[1])
+        var b = c1[2] + v*(c2[2]-c1[2])
+        return rgbToHex(r,g,b)
+    }
+
+
+    var ltc = $("#listtask_container > div")
+
+    var lt_template = $("#listtask_template").detach()
+    lt_template.css("visibility", "visible")
+    lt_template.removeAttr("hidden")
+
+
+    function createListTask(data){
+        lt = lt_template.clone()
+        lt.attr("id", "listtask"+data.id)
+        lt.find(".todopriority > span").text(data.priority)
+        lt.find(".todotitle > span").text(data.title)
+        return lt
+    }
+
+
+    var extract_prio = function(element){
+        return parseInt($(element).find(".todopriority span").text())
+    }
+    var compare_priorities = function(a, b) {
+        var ap = extract_prio(a)
+        var bp = extract_prio(b)
+        if (ap > bp) {
+            return -1;
+        }
+        if (ap < bp) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function sortTasks(order_by){
+        var L = $("#listtask_container .listtask").detach().toArray()
+        L.sort(compare_priorities)
+        $.each(L, function(index, element){
+            $(element).appendTo(ltc) // to listtask container
+        })   
+    }
+
+    function makeListTask(element){
+        var lt = $(element)
+        var self = lt
+        lt.buttons = lt.find(".buttons")
+        lt.pbuttons = lt.find(".todopriority > a")
+        var id = parseInt(lt.attr("id").match(/\d+/)[0])
+
+        lt.find(".buttons .remove").click(function(e){
+            $.post("/api/listtask/"+id+"/delete", function(data){
+                lt.remove()
+            })
+            e.preventDefault()
+        })
+
+
+        lt.mouseenter(function(e){
+            lt.buttons.css("visibility", "visible")
+            lt.pbuttons.css("visibility", "visible")
+        }).mouseleave(function(e){
+            lt.buttons.css("visibility", "hidden")
+            lt.pbuttons.css("visibility", "hidden")
+        })
+
+        lt.getPriority = function(){
+            var pe = $(this).find(".todopriority > span")
+            var p = parseInt(pe.text())
+            return p
+        }
+        
+
+        lt.updatePriority = function(){
+            var pe = $(this).find(".todopriority > span")
+            var p = parseInt(pe.text())
+            pe.css("color", GetGradientColor(p/100))
+        }
+
+        lt.setPriority = function(v){
+            $(this).find(".todopriority > span").text(v)
+            this.updatePriority()
+        }
+
+        lt.updatePriority()
+
+        lt.find(".todopriority .plus").click(function(e){
+            var p = lt.getPriority()
+            p += 10;
+            if (p>100) { p = 100 }
+            lt.setPriority(p)
+            $.post("/api/listtask/"+id, { priority: p })
+                .done(function(data){
+                    sortTasks()
+                })
+        })
+
+        lt.find(".todopriority .minus").click(function(e){
+            var p = lt.getPriority()
+            p -= 10;
+            if (p<0) { p = 0 }
+            lt.setPriority(p)
+            $.post("/api/listtask/"+id, { priority: p })
+                .done(function(data){
+                    sortTasks()
+                })
+        })
+
+        lt.expanded = false
+        lt.find(".todotitle").click(function(e){
+            if (lt.expanded) {
+                lt.find(".exp").css("display", "none")
+            } else {
+                lt.find(".exp").css("display", "block")
+            }
+            lt.expanded = !lt.expanded
+        })
+
+
+        lt.find(".edit").click(function(e){
+            // console.log("EDIT")
+            $.getJSON("/api/listtask/"+id+"/edit")
+                .done(function(resp){
+                    if (resp.status != "ok") { return }
+                    var data = resp.data
+
+                    lt.find(".editpanel form textarea").text(data.description_body)
+                    lt.find(".editpanel form input[name=title]").val(data.title)
+                    lt.find(".editpanel form input[name=priority]").val(data.priority)
+
+                    lt.find(".editpanel").css("display", "block")
+                    lt.find(".descpanel").css("display", "none")
+                })
+        })
+
+        lt.find(".editpanel form").submit(function(e){
+            var form = this
+            var formdata = {}
+            $(form).serializeArray().map(function(item) {
+                formdata[item.name] = item.value;
+            }); 
+
+            if (formdata["title"].length == 0) { return }
+
+            $(form).get(0).reset()
+
+            $.post("/api/listtask/"+id+"/edit", formdata)
+                .done(function(resp){
+                    console.log(resp)
+                    if (resp.status == "ok") {
+                        var data = resp.data
+                        lt.find(".descpanel .description").html(data.description)
+                        lt.setPriority(data.priority)
+                        lt.find(".todotitle span").text(data.title)
+                        sortTasks()
+
+                        lt.find(".editpanel").css("display", "none")
+                        lt.find(".descpanel").css("display", "block")
+                    }
+                })
+
+            e.preventDefault()
+        })
+    }
+
+    
+
+    function form_submit(form){
+        var formdata = {}
+        var url = form.action
+        $(form).serializeArray().map(function(item) {
+            formdata[item.name] = item.value;
+        }); 
+
+        if (formdata["title"].length == 0) { return }
+
+        $(form).find("input").val("")
+
+        $.post("/api/listtask/add", formdata)
+            .done(function(resp){
+                console.log(resp)
+                if (resp.status == "ok") {
+                    var data = resp.data
+                    var lt = createListTask(data)
+                    lt.appendTo(ltc)
+                    makeListTask(lt)
+                    sortTasks()
+                }
+            })
+    }
+    $("#listtask_container > form").submit(function(e){
+        form_submit(this)
+        e.preventDefault()
+    })
+
+
+    
+
+    $(".listtask").each( function(index, element){
+        makeListTask(element)
+    })
+    sortTasks()
+
+
 });
 </script>
 <style>
@@ -377,7 +608,7 @@ $(function() {
 .task .title {
     font-weight: 400;
     font-size: 25px;
-    font-family: "Roboto Condensed", sans-serif;
+    font-family: "Ubuntu Condensed", sans-serif;
 }
 .task .duration {
     margin-left: 20px;
@@ -462,6 +693,164 @@ $(function() {
 .reset:hover { background-position: -1px -23px; }
 .reset:active { background-position: -1px -46px; }
 
+
+.listtask {
+    font-family: "Arial", sans-serif;
+    padding-left: 15px;
+    /*height: 20px;*/
+    width: 420px;
+}
+
+.listtask:hover {
+    background-color: #050505;
+}
+
+.listtask > * {
+    vertical-align: middle;
+}
+
+.listtask .todopriority {
+    display:inline-block;
+    position: relative;
+    width: 50px;
+    height: 50px;
+    text-align: center;
+}
+.listtask .todopriority > span{
+    position: absolute;
+    font-size: 25px;
+    font-family: "PT Sans Narrow", sans-serif;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+/*.listtask .todopriority > a{
+    display: inline;
+    height: 20px;
+    width: 25px;
+    font-size: 25px;
+    position: absolute;
+    text-decoration: none;
+    left: -5px;
+    visibility: hidden;
+}*/
+/*.listtask .todopriority .minus { top: 16px;}
+.listtask .todopriority .plus { top: 7px; font-size: 20px;}*/
+
+.listtask .todotitle {
+    display: inline-block;
+    height: 50px;
+    width: 250px;
+    text-align: left;
+    font-family: "Ubuntu Condensed", sans-serif;
+    font-size: 20px;
+}
+
+.listtask .todotitle > span {
+    display: inline-block;
+    position: relative;
+    top: 12px;
+}
+
+.listtask .buttons{
+    display: inline-block;
+    visibility: hidden;
+}
+
+.listtask .buttons > a {
+    display: inline-block;
+    background-image: url('/static/todobtns.png');
+    /*width: 23px;*/
+    height: 26px;
+}
+
+.complete { background-position: -54px 0px; width: 25px;}
+.complete:hover { background-position: -54px -26px; }
+.complete:active { background-position: -54px -51px; }
+
+.uncomplete { background-position: -78px 0px; width: 30px;}
+.uncomplete:hover { background-position: -78px -26px; }
+.uncomplete:active { background-position: -78px -51px; }
+
+.remove { background-position: -106px 0px; width: 23px;}
+.remove:hover { background-position: -106px -26px; }
+.remove:active { background-position: -106px -51px; }
+
+/*.expand { background-position: 0px 0px; width: 24px; height: 25px;}
+.expand:hover { background-position: 0px -34px; width: 24px; height: 17px;}
+.expand:active { background-position: 0px -59px; width: 24px; height: 17px;}*/
+
+
+.listtask .todopriority > a {
+    position: absolute;
+    display: inline-block;
+    background-image: url('/static/priobtns.png');
+    width: 17px;
+    height: 13px;
+    left: -10px;
+    visibility: hidden;
+}
+
+.listtask .todopriority .minus { background-position: -0px -0px; top: 26px; }
+.listtask .todopriority .minus:hover { background-position: -0px -18px; top: 26px; }
+.listtask .todopriority .minus:active { background-position: -0px -35px; top: 26px; }
+
+.listtask .todopriority .plus { background-position: -20px -0px; top: 13px; }
+.listtask .todopriority .plus:hover { background-position: -20px -18px; top: 13px; }
+.listtask .todopriority .plus:active { background-position: -20px -35px; top: 13px; }
+
+#listtask_container input, #listtask_container textarea {
+    background-color: #0b0b0b;
+    border: 1px solid #222222;
+    color: #79797a;
+    /*font-family: "Ubuntu Condensed", sans-serif;*/
+    /*font-size: 15px;*/
+}
+
+#listtask_container textarea {
+    resize: vertical;
+    font-family: sans-serif;
+    font-size: 12px;
+    height: 200px;
+    width: 340px;
+}
+/*#listtask_container input {*/
+    /*height: 30px;*/
+/*}*/
+
+#listtask_container input[name="priority"] {
+    width: 40px;
+}
+#listtask_container input[name="title"] {
+    /*width: 40px;*/
+}
+
+.listtask .exp {
+    margin-left: 60px;
+    display: none;
+    position: relative;
+}
+
+.listtask .exp .edit{
+    position: absolute;
+    left: -40px;
+}
+
+.listtask .exp .descpanel{
+    position: relative;
+    top: -12px;
+}
+
+.listtask .exp .editpanel{
+    display: none;
+}
+
+
+.listtask .exp > * {
+    /*font-family: Calibri, Arial, sans-serif;*/
+    /*font-size: 13px;*/
+}
+
 </style>
 {% endblock%}
 
@@ -469,7 +858,9 @@ $(function() {
 {% block content %}
 
 
+<div>
 {% for task in tasks %}
+
     <div id="task{{ task.id }}" class="task">
         <div class="pbcont">
             <div><span class="title">{{task.title}}</span><span class="duration"></span></div>
@@ -481,7 +872,63 @@ $(function() {
         <div class="clock">
         </div>
     </div>
+
 {% endfor %}
-
-
+</div>
+<div id="listtask_container">
+    <form action="/api/listtask/add" method="post">
+        <!-- <input type="range" name="priority" min="0" max="100"> -->
+        <input type="text" name="title"></input>
+    </form>
+    <div>
+    {% for listtask in listtasks %}
+        <div id="listtask{{ listtask.id }}" data-created="" class="listtask">
+            <div class="todopriority">
+                <a class="minus"></a>
+                <a class="plus"></a>
+                <span>{{ listtask.priority }}</span>
+            </div>
+            <div class="todotitle">
+                <span>{{ listtask.title }}</span>
+            </div>
+            <div class="buttons">
+                <a class="complete"></a>
+                <a class="uncomplete"></a>
+                <a class="remove"></a>
+            </div>
+            <div class="exp">
+                <div class="descpanel">
+                    <p><a class="edit">Edit</a></p>
+                    <span class="description">{{ listtask.description_markdown }}</span>
+                </div>
+                <div class="editpanel">
+                    <form action="" method="post">
+                        <textarea name="descbody"></textarea>
+                        <div>
+                            <input type="text" name="priority"></input>
+                            <input type="text" name="title"></input>
+                        </div>
+                        <input type="submit"></input>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+    </div>
+</div>
+        <div hidden="hidden" style="visibility: hidden" id="listtask_template" data-created="" class="listtask">
+             <div class="todopriority">
+                <a class="minus"></a>
+                <a class="plus"></a>
+                <span></span>
+            </div>
+            <div class="todotitle">
+                <span></span>
+            </div>
+            <div class="buttons">
+                <a class="complete"></a>
+                <a class="uncomplete"></a>
+                <a class="remove"></a>
+            </div>
+        </div>
 {% endblock %}
