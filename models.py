@@ -7,19 +7,19 @@ from markdown import markdown
 from flask import Markup
 
 
-class User(Base):
-    __tablename__ = 'users'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True)
-    email = Column(String(120), unique=True)
+# class User(Base):
+#     __tablename__ = 'users'
+#     id = Column(Integer, primary_key=True)
+#     name = Column(String(50), unique=True)
+#     email = Column(String(120), unique=True)
 
-    # def __init__(self, name=None, email=None):
-    #     self.name = name
-    #     self.email = email
+#     # def __init__(self, name=None, email=None):
+#     #     self.name = name
+#     #     self.email = email
 
 
-    def __repr__(self):
-        return '<User %r>' % (self.name)
+#     def __repr__(self):
+#         return '<User %r>' % (self.name)
 
 
 class ListTask(Base):
@@ -33,6 +33,8 @@ class ListTask(Base):
     created_date = Column(DateTime, default=datetime.datetime.now())
     is_time_limited = Column(Boolean, default = False)
     expiration_date = Column(DateTime, default=datetime.datetime.now())
+
+    use_markup = Column(Boolean, default = False)
 
     @property
     def description_markdown(self):

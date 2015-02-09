@@ -434,9 +434,11 @@ $(function() {
         })   
     }
 
+    var currentlyEditing
+
     function makeListTask(element){
         var lt = $(element)
-        var self = lt
+        var self = element
         lt.buttons = lt.find(".buttons")
         lt.pbuttons = lt.find(".todopriority > a")
         var id = parseInt(lt.attr("id").match(/\d+/)[0])
@@ -457,7 +459,7 @@ $(function() {
             lt.pbuttons.css("visibility", "hidden")
         })
 
-        lt.getPriority = function(){
+        self.getPriority = function(){
             var pe = $(this).find(".todopriority > span")
             var p = parseInt(pe.text())
             return p
@@ -478,8 +480,13 @@ $(function() {
         lt.updatePriority()
 
         lt.find(".todopriority .plus").click(function(e){
-            var p = lt.getPriority()
-            p += 10;
+            var p = lt.get(0).getPriority()
+            // var prev = lt.prev().get(0)
+            // if (prev != undefined){
+            //     p = prev.getPriority()+1;
+            // } else {
+                p += 10;
+            // }
             if (p>100) { p = 100 }
             lt.setPriority(p)
             $.post("/api/listtask/"+id, { priority: p })
@@ -489,8 +496,13 @@ $(function() {
         })
 
         lt.find(".todopriority .minus").click(function(e){
-            var p = lt.getPriority()
-            p -= 10;
+            var p = lt.get(0).getPriority()
+            // var next = lt.next().get(0)
+            // if (next != undefined){
+            //     p = next.getPriority()-1;
+            // } else {
+                p -= 10;
+            // }
             if (p<0) { p = 0 }
             lt.setPriority(p)
             $.post("/api/listtask/"+id, { priority: p })
@@ -500,15 +512,27 @@ $(function() {
         })
 
         lt.expanded = false
-        lt.find(".todotitle").click(function(e){
-            if (lt.expanded) {
-                lt.find(".exp").css("display", "none")
+        lt.toggleExpand = function(force){
+            if (this == currentlyEditing) { return }
+            if (force == true) { this.expanded = false }
+            if (this.expanded) {
+                this.find(".exp").css("display", "none")
             } else {
-                lt.find(".exp").css("display", "block")
+                this.find(".exp").css("display", "block")
             }
-            lt.expanded = !lt.expanded
+            this.expanded = !this.expanded
+        }
+        lt.find(".todotitle").click(function(e){
+            lt.toggleExpand()
+            e.preventDefault()
         })
 
+
+        lt.cancelEdit = function() {
+            lt.toggleExpand(true)
+            lt.find(".edit_show").css("display", "none")
+            lt.find(".edit_hide").css("display", "block")
+        }
 
         lt.find(".edit").click(function(e){
             // console.log("EDIT")
@@ -517,17 +541,24 @@ $(function() {
                     if (resp.status != "ok") { return }
                     var data = resp.data
 
-                    lt.find(".editpanel form textarea").text(data.description_body)
-                    lt.find(".editpanel form input[name=title]").val(data.title)
-                    lt.find(".editpanel form input[name=priority]").val(data.priority)
+                    lt.find(".editpanel textarea").text(data.description_body)
+                    lt.find(".todotitle input[name=title]").val(data.title)
+                    lt.find(".editpanel input[name=priority]").val(data.priority)
 
-                    lt.find(".editpanel").css("display", "block")
-                    lt.find(".descpanel").css("display", "none")
+                    lt.toggleExpand(true)
+                    lt.find(".edit_show").css("display", "block")
+                    lt.find(".edit_hide").css("display", "none")
+
+                    if (currentlyEditing){
+                        currentlyEditing.cancelEdit()
+                    }
+                    currentlyEditing = lt
                 })
         })
 
-        lt.find(".editpanel form").submit(function(e){
-            var form = this
+
+
+        var editpanel_submit = function(form){
             var formdata = {}
             $(form).serializeArray().map(function(item) {
                 formdata[item.name] = item.value;
@@ -547,18 +578,24 @@ $(function() {
                         lt.find(".todotitle span").text(data.title)
                         sortTasks()
 
-                        lt.find(".editpanel").css("display", "none")
-                        lt.find(".descpanel").css("display", "block")
+                        lt.find(".edit_show").css("display", "none")
+                        lt.find(".edit_hide").css("display", "block")
+
+                        currentlyEditing = null
                     }
                 })
-
+        }
+        lt.find("form").submit(function(e){
+            editpanel_submit(this)
+            e.preventDefault()
+        })
+        lt.find(".editpanel .save").click(function(e){
+            editpanel_submit(lt.find("form").get(0))
             e.preventDefault()
         })
     }
 
-    
-
-    function form_submit(form){
+    var add_form_submit = function(form){
         var formdata = {}
         var url = form.action
         $(form).serializeArray().map(function(item) {
@@ -578,13 +615,32 @@ $(function() {
                     lt.appendTo(ltc)
                     makeListTask(lt)
                     sortTasks()
+                    $("#addform > input").fadeOut()
                 }
             })
     }
     $("#listtask_container > form").submit(function(e){
-        form_submit(this)
+        add_form_submit(this)
         e.preventDefault()
     })
+
+
+    $("#addbtn").click(function(e){
+        var addfield = $("#addform > input")
+        if (!addfield.is(":visible")){
+            addfield.fadeIn(400)
+        } else {
+            add_form_submit($("#addform").get(0))
+        }
+    })
+    // $("#listtask_container > form > input")
+    //     .mouseenter(function(e){
+    //         $(this).fadeTo(100, 1)
+    //     })
+    //     .mouseleave(function(e){
+    //         $(this).delay( 2000 ).fadeTo(600, 0.2)
+    //     })
+    //     .fadeTo(0, 0.2)
 
 
     
@@ -619,7 +675,7 @@ $(function() {
 .task .clock {
     position:relative;
     left: 50px;
-    /*top: 20px;*/
+    top: 20px;
     width: 130px;
     height: 130px;
 }
@@ -694,11 +750,17 @@ $(function() {
 .reset:active { background-position: -1px -46px; }
 
 
+#listtask_container {
+    position: absolute;
+    left: 550px;
+    top: 70px;
+}
+
 .listtask {
     font-family: "Arial", sans-serif;
-    padding-left: 15px;
+    padding-left: 17px;
     /*height: 20px;*/
-    width: 420px;
+    width: 450px;
 }
 
 .listtask:hover {
@@ -706,6 +768,9 @@ $(function() {
 }
 
 .listtask > * {
+    vertical-align: middle;
+}
+.listtask form > * {
     vertical-align: middle;
 }
 
@@ -757,7 +822,7 @@ $(function() {
     visibility: hidden;
 }
 
-.listtask .buttons > a {
+.listtask .buttons > a, #addbtn {
     display: inline-block;
     background-image: url('/static/todobtns.png');
     /*width: 23px;*/
@@ -775,6 +840,14 @@ $(function() {
 .remove { background-position: -106px 0px; width: 23px;}
 .remove:hover { background-position: -106px -26px; }
 .remove:active { background-position: -106px -51px; }
+
+.edit { background-position: -164px 0px; width: 25px;}
+.edit:hover { background-position: -164px -26px; }
+.edit:active { background-position: -164px -51px; }
+
+#addbtn { background-position: -192px 0px; width: 25px;}
+#addbtn:hover { background-position: -192px -26px; }
+#addbtn:active { background-position: -192px -51px; }
 
 /*.expand { background-position: 0px 0px; width: 24px; height: 25px;}
 .expand:hover { background-position: 0px -34px; width: 24px; height: 17px;}
@@ -799,7 +872,11 @@ $(function() {
 .listtask .todopriority .plus:hover { background-position: -20px -18px; top: 13px; }
 .listtask .todopriority .plus:active { background-position: -20px -35px; top: 13px; }
 
-#listtask_container input, #listtask_container textarea {
+#listtask_container form {
+    display: block;
+}
+
+#listtask_container textarea {
     background-color: #0b0b0b;
     border: 1px solid #222222;
     color: #79797a;
@@ -809,39 +886,87 @@ $(function() {
 
 #listtask_container textarea {
     resize: vertical;
+    overflow: hidden;
     font-family: sans-serif;
     font-size: 12px;
     height: 200px;
-    width: 340px;
+    width: 370px;
+    margin-bottom: 10px;
+    padding: 3px 3px 0px 5px;
 }
-/*#listtask_container input {*/
-    /*height: 30px;*/
-/*}*/
 
-#listtask_container input[name="priority"] {
+#listtask_container input, #addform input {
+    border: 0;
+    border-left: 3px solid #333333;
+    background-color: #090909;
+    color: #79797a;
+    margin: 5px 10px 5px 0px;
+    font-family: "Ubuntu Condensed", sans-serif;
+    font-size: 20px;
+    padding-left:8px;
+    height: 20px;
+}
+
+#addbtn {
+    margin-left: 32px;
+    opacity: 0.4;
+}
+
+#addform input {
+    margin:0;
+    position: relative;
+    top: -5px;
+    left: 7px;
+    display: none;
+}
+
+#listtask_container .editpanel input[name="priority"] {
     width: 40px;
 }
-#listtask_container input[name="title"] {
-    /*width: 40px;*/
+#listtask_container .todotitle input[name="title"] {
+    /*width: 295px;*/
+    font-size: 20px;
+    position: relative;
+    padding:5px 5px 5px 5px;
+    border: 1px solid #222222;
+    top: 4px;
+    left: -6px;
+}
+#listtask_container .editpanel .save {
+    color: #464748;
+    display: inline-block;
+    font-family: "Ubuntu Condensed", sans-serif;
+    font-size: 20px;
+    position: relative;
+    left: 300px;
+    margin-bottom: 20px;
+}
+#listtask_container .editpanel .save:hover {
+    text-decoration: none;
+    color: #a7aaac;
+}
+#listtask_container .editpanel .save:active {
+    text-decoration: none;
+    color: #e9eaec;
 }
 
 .listtask .exp {
-    margin-left: 60px;
+    margin-left: 47px;
     display: none;
     position: relative;
 }
 
-.listtask .exp .edit{
+/*.listtask .exp .edit{
     position: absolute;
     left: -40px;
-}
+}*/
 
 .listtask .exp .descpanel{
     position: relative;
     top: -12px;
 }
 
-.listtask .exp .editpanel{
+.listtask .edit_show{
     display: none;
 }
 
@@ -876,59 +1001,84 @@ $(function() {
 {% endfor %}
 </div>
 <div id="listtask_container">
-    <form action="/api/listtask/add" method="post">
+    <form id="addform" action="/api/listtask/add" method="post">
+        <a id="addbtn"></a>
         <!-- <input type="range" name="priority" min="0" max="100"> -->
-        <input type="text" name="title"></input>
+        <input type="text" name="title" tabindex="-1"></input>
     </form>
     <div>
     {% for listtask in listtasks %}
         <div id="listtask{{ listtask.id }}" data-created="" class="listtask">
+            <form action="" method="post">
             <div class="todopriority">
                 <a class="minus"></a>
                 <a class="plus"></a>
                 <span>{{ listtask.priority }}</span>
             </div>
             <div class="todotitle">
-                <span>{{ listtask.title }}</span>
+                <span class="edit_hide">{{ listtask.title }}</span>
+                <input class="edit_show" type="text" name="title"></input>
             </div>
             <div class="buttons">
+                <a class="edit"></a>
                 <a class="complete"></a>
                 <a class="uncomplete"></a>
                 <a class="remove"></a>
             </div>
             <div class="exp">
-                <div class="descpanel">
-                    <p><a class="edit">Edit</a></p>
+                <div class="descpanel edit_hide">
                     <span class="description">{{ listtask.description_markdown }}</span>
                 </div>
-                <div class="editpanel">
-                    <form action="" method="post">
+                <div class="editpanel edit_show">
+                    
                         <textarea name="descbody"></textarea>
                         <div>
+                            <!-- <input type="range" name="priority"></input> -->
                             <input type="text" name="priority"></input>
-                            <input type="text" name="title"></input>
+                            <!-- <input type="checkbox" name="use_markup"></input> -->
+                            <div><a class="save">Save</a></div>
                         </div>
-                        <input type="submit"></input>
-                    </form>
+                    
                 </div>
             </div>
+            </form>
         </div>
     {% endfor %}
     </div>
 </div>
         <div hidden="hidden" style="visibility: hidden" id="listtask_template" data-created="" class="listtask">
-             <div class="todopriority">
+            <form action="" method="post">
+            <div class="todopriority">
                 <a class="minus"></a>
                 <a class="plus"></a>
                 <span></span>
             </div>
             <div class="todotitle">
-                <span></span>
+                <span class="edit_hide"></span>
+                <input class="edit_show" type="text" name="title"></input>
             </div>
             <div class="buttons">
+                <a class="edit"></a>
                 <a class="complete"></a>
                 <a class="uncomplete"></a>
                 <a class="remove"></a>
             </div>
+            <div class="exp">
+                <div class="descpanel edit_hide">
+                    <span class="description"></span>
+                </div>
+                <div class="editpanel edit_show">
+                    
+                        <textarea name="descbody"></textarea>
+                        <div>
+                            <!-- <input type="range" name="priority"></input> -->
+                            <input type="text" name="priority"></input>
+                            <!-- <input type="checkbox" name="use_markup"></input> -->
+                            <div><a class="save">Save</a></div>
+                        </div>
+                    
+                </div>
+            </div>
+            </form>
         </div>
 {% endblock %}

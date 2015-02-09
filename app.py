@@ -3,7 +3,7 @@ from flask import render_template
 from flask import jsonify
 from flask import request
 from database import db_session
-from models import User, Task, ListTask
+from models import Task, ListTask
 
 from flask.ext.admin import Admin, BaseView, expose #flask-admin
 from flask.ext.admin.contrib.sqla import ModelView
@@ -25,7 +25,6 @@ app.config['CSRF_ENABLED'] = True
 
 admin = Admin(app)
 admin.add_view(ModelView(Task, db_session))
-admin.add_view(ModelView(User, db_session))
 admin.add_view(ModelView(ListTask, db_session))
 
 
