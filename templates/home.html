@@ -5,8 +5,6 @@
 <script>
 $(function() {
 
-    var Tasks = []
-
     function componentToHex(c) {
         var hex = c.toString(16);
         return hex.length == 1 ? "0" + hex : hex;
@@ -18,6 +16,14 @@ $(function() {
         b = parseInt(b)
         return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
     }
+
+    function rgbToHex2(r, g, b) {
+        r = parseInt(r)
+        g = parseInt(g)
+        b = parseInt(b)
+        return componentToHex(r) + componentToHex(g) + componentToHex(b);
+    }
+
     var mulColor = function (hex, mul) {
         // hex to rgb
         var bigint = parseInt(hex, 16);
@@ -35,6 +41,125 @@ $(function() {
     var genColor = function(hex){
         return ["#"+hex, mulColor(hex,0.4)]
     }
+
+    // var defX = function(e) {
+    //     if (!e) e = window.event;
+    //     var hscroll = !document.body.scrollLeft && (browser.ipad || browser.iphone4 || browser.ipod4) ? 0 : (document.all ? document.body.scrollLeft : window.pageXOffset);
+    //     return parseInt(e.clientX + hscroll);
+    // }
+
+    function getXY(obj, forFixed) {
+      if (!obj) return [0,0];
+
+      var left = 0, top = 0, pos, lastLeft;
+      if (obj.offsetParent) {
+        do {
+          left += (lastLeft = obj.offsetLeft);
+          top += obj.offsetTop;
+          pos = obj.style.position
+          if (pos == 'fixed' || pos == 'absolute' || (pos == 'relative')) {
+            left -= obj.scrollLeft;
+            top -= obj.scrollTop;
+            if (pos == 'fixed' && !forFixed) {
+              left += ((obj.offsetParent || {}).scrollLeft || bodyNode.scrollLeft || htmlNode.scrollLeft);
+              top += ((obj.offsetParent || {}).scrollTop || bodyNode.scrollTop || htmlNode.scrollTop);
+            }
+          }
+        } while (obj = obj.offsetParent);
+      }
+      return [left,top];
+    }
+
+    function cancelEvent(event) {
+  event = (event || window.event);
+  if (!event) return false;
+  while (event.originalEvent) {
+    event = event.originalEvent;
+  }
+  if (event.preventDefault) event.preventDefault();
+  if (event.stopPropagation) event.stopPropagation();
+  event.cancelBubble = true;
+  event.returnValue = false;
+  return false;
+}
+
+    function StatusBar(parent, bClickable){
+        'use strict';
+
+        this.parent = parent
+        $('<div draggable="true" class="background"><div class="value"></div></div').appendTo(parent)
+        this.bg = $(parent).find("> div").get(0)
+        this.bar = $(parent).find("> div > div").get(0)
+
+        $(this.bg).css({
+                    "height": "100%",
+                    "width": "100%",
+                    "border-radius": "3px",
+                    "background": "#660000"
+                })
+
+        $(this.bar).css({
+                    "height": "100%",
+                    "width": "40%",
+                    "border-radius": "3px",
+                    "background": "#aa0000"
+                })
+
+
+        // var self = this
+
+        // if (bClickable) {
+        //     var barClick = function(e){
+        //         self.newvalueHandler(e)
+        //         cancelEvent(e)
+        //     }
+
+        //     var removeHandlers = function(e){
+        //             $(this).off("mousemove")
+        //             $(this).off("mouseup")
+        //         }
+
+        //     $(this.bg).on("mousedown", function(e){
+        //         barClick(e)
+        //         $(this).on("mousemove", barClick)
+        //         $(this).on("mouseup", removeHandlers)
+        //     })
+        // }
+
+        this.setColor("00BB00")
+        // this.setMinMaxValues(0,100)
+        this.setValue(0.5)
+    }
+
+    StatusBar.prototype.min = 0
+    StatusBar.prototype.max = 1
+    StatusBar.prototype.value = 0
+    StatusBar.prototype.newvalueHandler = function(){}
+
+    StatusBar.prototype.onnewvalue = function(f){
+        this.newvalueHandler = f
+    }
+
+    StatusBar.prototype.setColor = function(hex){
+        $(this.bar).css("background", "#"+hex)
+        $(this.bg).css("background", mulColor(hex, 0.5))
+    }
+
+    StatusBar.prototype.setValue = function(val){
+        var p = 100* ((val - this.min) / (this.max - this.min))
+        if (p>100) { p = 100 }
+        if (p<0) { p = 0 } // it looks ugly if any less
+        $(this.bar).css("width", p+"%")
+    }
+    // StatusBar.prototype.setMinMaxValues = function(min,max){
+    //     this.min = min
+    //     this.max = max
+    //     this.setValue(this.value)
+    // }
+
+
+    var Tasks = []
+
 
 
     $(".task").each( function(index){
@@ -254,6 +379,23 @@ $(function() {
                 this.pomoTimer.pause()
             }
         }
+        this.stop_task = function(){
+            if (this.taskState == "ACTIVE" || this.taskState == "POMO"){
+                this.taskState = "INACTIVE"
+                this.pomoState= "INACTIVE"
+
+                // this.taskStartTime = Date.now()
+                // this.taskLastSync = Date.now()
+                // this.taskSyncPeriod = 1*60
+
+                this.progress.setColor(colors.inactive)
+
+                this._update(true)
+                this.normalTimer.pause()
+                this.pomoTimer.pause()
+                this.clock.hide()
+            }
+        }
 
 
         this.start_break = function(){
@@ -308,14 +450,25 @@ $(function() {
 
         $(this).find(".start").click(function(){
             task.start_task()
+            $(this).hide()
+            $(this).siblings(".stop").show()
         });
+        $(this).find(".stop").click(function(){
+            task.stop_task()
+            $(this).hide()
+            $(this).siblings(".start").show()
+        }).hide();
 
         $(this).find(".reset").click(function(){
             task.reset()
+            $(this).siblings(".start").show()
+            $(this).siblings(".stop").hide()
         });
 
         $(this).find(".pomo").click(function(){
             task.start_pomo()
+            $(this).siblings(".start").hide()
+            $(this).siblings(".stop").show()
         });
 
 
@@ -544,6 +697,10 @@ $(function() {
                     lt.find(".editpanel textarea").text(data.description_body)
                     lt.find(".todotitle input[name=title]").val(data.title)
                     lt.find(".editpanel input[name=priority]").val(data.priority)
+                    var p = data.priority/100
+                    lt.statusbar.setValue(p)
+                    var newcolor = GetGradientColor(p).substring(1) // strip leading #
+                    lt.statusbar.setColor(newcolor)
 
                     lt.toggleExpand(true)
                     lt.find(".edit_show").css("display", "block")
@@ -593,6 +750,50 @@ $(function() {
             editpanel_submit(lt.find("form").get(0))
             e.preventDefault()
         })
+
+
+        var sb = new StatusBar(lt.find(".priobar").get(0), true)
+        lt.statusbar = sb
+        // sb.onnewvalue()
+
+        var areaElement = lt.find(".exp")
+
+        var draggingElement = null
+
+        var func = function(e){
+            var el = draggingElement // e.currentTarget
+            var ex = el._globaloffsetX || getXY(el)[0]
+            el._globaloffsetX = ex
+            var val = e.clientX - ex
+            var width = el.offsetWidth
+
+            var p = val/width
+            // console.log(val, width, p, ex)
+            sb.setValue(p)
+            var newcolor = GetGradientColor(p).substring(1) // strip leading #
+            sb.setColor(newcolor)
+            lt.find("input[name=priority]").val(parseInt(p*100))
+        }
+
+        var barClick = function(e){
+            // self.newvalueHandler(e)
+            func(e)
+            cancelEvent(e)
+        }
+
+        var removeHandlers = function(e){
+                areaElement.off("mousemove")
+                areaElement.off("mouseup")
+                draggingElement = null
+            }
+
+        $(sb.bg).on("mousedown", function(e){
+            draggingElement = e.currentTarget
+            barClick(e)
+            areaElement.on("mousemove", barClick)
+            areaElement.on("mouseup", removeHandlers)
+        })
+
     }
 
     var add_form_submit = function(form){
@@ -654,6 +855,7 @@ $(function() {
 });
 </script>
 <style>
+
 
 .task > * {
     display: inline-block;
@@ -744,6 +946,10 @@ $(function() {
 .start { background-position: -27px 0px; }
 .start:hover { background-position: -27px -23px; }
 .start:active { background-position: -27px -46px; }
+
+.stop { background-position: -104px 0px; }
+.stop:hover { background-position: -104px -23px; }
+.stop:active { background-position: -104px -46px; }
 
 .reset { background-position: -1px 0px; }
 .reset:hover { background-position: -1px -23px; }
@@ -940,6 +1146,7 @@ $(function() {
     position: relative;
     left: 300px;
     margin-bottom: 20px;
+    margin-top: 15px;
 }
 #listtask_container .editpanel .save:hover {
     text-decoration: none;
@@ -948,6 +1155,11 @@ $(function() {
 #listtask_container .editpanel .save:active {
     text-decoration: none;
     color: #e9eaec;
+}
+
+#listtask_container .editpanel .priobar {
+    height: 8px;
+    width: 300px;
 }
 
 .listtask .exp {
@@ -983,6 +1195,10 @@ $(function() {
 {% block content %}
 
 
+<div id="statusbar" style="position:relative; top: 400px; left: 300px; width:200px; height: 10px;">
+
+</div>
+
 <div>
 {% for task in tasks %}
 
@@ -992,6 +1208,7 @@ $(function() {
             <div class="progressbar"></div>
             <a src="" class="reset"><span>Reset</span></a>
             <a src="" class="start"><span>Start</span></a>
+            <a src="" class="stop"><span>Stop</span></a>
             <a src="" class="pomo"><span>Pomodoro</span></a>
         </div>
         <div class="clock">
@@ -1034,7 +1251,9 @@ $(function() {
                         <textarea name="descbody"></textarea>
                         <div>
                             <!-- <input type="range" name="priority"></input> -->
-                            <input type="text" name="priority"></input>
+                            <!-- <input type="text" name="priority"></input> -->
+                            <input type="hidden" name="priority"></input>
+                            <div class="priobar"></div>
                             <!-- <input type="checkbox" name="use_markup"></input> -->
                             <div><a class="save">Save</a></div>
                         </div>
@@ -1071,9 +1290,11 @@ $(function() {
                     
                         <textarea name="descbody"></textarea>
                         <div>
+
                             <!-- <input type="range" name="priority"></input> -->
-                            <input type="text" name="priority"></input>
+                            <!-- <input type="text" name="priority"></input> -->
                             <!-- <input type="checkbox" name="use_markup"></input> -->
+                            
                             <div><a class="save">Save</a></div>
                         </div>
                     
