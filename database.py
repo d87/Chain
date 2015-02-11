@@ -3,10 +3,8 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 # engine = create_engine('sqlite:////tmp/test.db', convert_unicode=True)
-engine = create_engine(
-                "mysql://django@localhost/whiplash",
-                isolation_level="READ UNCOMMITTED"
-            )
+engine = create_engine( "mysql://django@localhost/whiplash" )
+# isolation_level="READ UNCOMMITTED"
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))

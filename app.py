@@ -152,5 +152,5 @@ def shutdown_session(exception=None):
 
 if __name__ == '__main__':
     app.debug = True
-    # app.run(host='0.0.0.0', threaded=True)
-    app.run(host='nevihta.d87', threaded=True)
+    # app.run(host='0.0.0.0')
+    app.run(host='nevihta.d87')

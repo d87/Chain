@@ -42,6 +42,27 @@ $(function() {
         return ["#"+hex, mulColor(hex,0.4)]
     }
 
+
+    function setCookie(name,value,days) {
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime()+(days*24*60*60*1000));
+            var expires = "; expires="+date.toGMTString();
+        }
+        else var expires = "";
+        document.cookie = name+"="+value+expires+"; path=/";
+    }
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for(var i=0;i < ca.length;i++) {
+            var c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+        }
+        return null;
+    }
+
     // var defX = function(e) {
     //     if (!e) e = window.event;
     //     var hscroll = !document.body.scrollLeft && (browser.ipad || browser.iphone4 || browser.ipod4) ? 0 : (document.all ? document.body.scrollLeft : window.pageXOffset);
@@ -588,6 +609,7 @@ $(function() {
     }
 
     var currentlyEditing
+    var expandedBeforeEdit
 
 
     var containerElement = ltc.get(0)
@@ -681,7 +703,7 @@ $(function() {
         lt.expanded = false
         lt.toggleExpand = function(force){
             if (this == currentlyEditing) { return }
-            if (force == true) { this.expanded = false }
+            if (force != undefined) { this.expanded = !force }
             if (this.expanded) {
                 this.find(".exp").css("display", "none")
             } else {
@@ -702,6 +724,11 @@ $(function() {
         }
 
         lt.find(".edit").click(function(e){
+            if (currentlyEditing == lt) {
+                lt.cancelEdit()
+                currentlyEditing = null
+                return
+            }
             // console.log("EDIT")
             $.getJSON("/api/listtask/"+id+"/edit")
                 .done(function(resp){
@@ -737,12 +764,13 @@ $(function() {
 
             if (formdata["title"].length == 0) { return }
 
-            $(form).get(0).reset()
-
             $.post("/api/listtask/"+id+"/edit", formdata)
                 .done(function(resp){
                     console.log(resp)
                     if (resp.status == "ok") {
+
+                        $(form).get(0).reset()
+                        
                         var data = resp.data
                         lt.find(".descpanel .description").html(data.description)
                         lt.setPriority(data.priority)
@@ -819,7 +847,6 @@ $(function() {
 
         if (formdata["title"].length == 0) { return }
 
-        $(form).find("input").val("")
 
         $.post("/api/listtask/add", formdata)
             .done(function(resp){
@@ -830,6 +857,7 @@ $(function() {
                     $(lt).appendTo(ltc)
                     makeListTask(lt)
                     sortTasks()
+                    $(form).find("input").val("")
                     $("#addform > input").fadeOut()
                 }
             })
@@ -866,6 +894,68 @@ $(function() {
     sortTasks()
 
 
+    var updateVolumeIcon = function(vol, p){
+        var icon = $(vol.icon)
+        icon.removeClass()
+        if (p > 0.66) {
+            return icon.addClass("level3")
+        } else if (p > 0.33) {
+            return icon.addClass("level2")
+        } else if (p > 0) {
+            return icon.addClass("level1")
+        } else {
+            return icon.addClass("mute")
+        }
+    }
+
+    var vol = new StatusBar($("#volumeControl").get(0))
+    vol.icon = $("#volumeIcon").get(0)
+    vol.container = $("#volumeContainer").get(0)
+    vol.container.vol = vol
+    vol.setColor("151515")
+    var areaElement = $("body")
+    var draggingElement = null
+
+    var p = getCookie('audio_vol') || 100
+    p = p/100
+    vol.setValue(p)
+    updateVolumeIcon(vol, p)
+
+    $("audio").attr("volume", p)
+
+    var barClick = function(e){
+        var el = draggingElement // e.currentTarget
+        var ex = el._globaloffsetX || getXY(el)[0]
+        el._globaloffsetX = ex
+        var val = e.clientX - ex
+        var width = el.offsetWidth
+        var p = val/width
+        vol.setValue(p)
+        updateVolumeIcon(vol, p)
+        $("audio").attr("volume", p)
+        setCookie('audio_vol', Math.round(p*100), 365);
+        cancelEvent(e)
+    }
+
+    var removeHandlers = function(e){
+        areaElement.off("mousemove")
+        areaElement.off("mouseup")
+        draggingElement = null
+    }
+
+    var onmousedown = function(e){
+        if (e.currentTarget.className != "background") {
+            draggingElement = $(e.currentTarget).find(".background").get(0)
+        } else {
+            draggingElement = e.currentTarget
+        }
+        barClick(e)
+        areaElement.on("mousemove", barClick)
+        areaElement.on("mouseup", removeHandlers)
+    }
+
+    $(vol.bg).on("mousedown", onmousedown) 
+    $(vol.container).on("mousedown", onmousedown) 
 });
 </script>
 <style>
@@ -937,6 +1027,7 @@ $(function() {
     height: 23px;
     margin: 0 50px 0 0;
     vertical-align: bottom;
+    cursor: pointer;
 }
 .task .pbcont a:hover {
     color: #a7a9ac;
@@ -1202,16 +1293,57 @@ $(function() {
     /*font-size: 13px;*/
 }
 
+
+
+#volumeContainer {
+    position: absolute;
+    top: 20px;
+    left: 15px;
+    /*margin-top:20px;*/
+    /*margin-left:15px;*/
+    cursor: pointer;
+}
+#volumeContainer > * {
+    vertical-align: middle;
+}
+
+#volumeControl {
+    display: inline-block;
+    /*position:relative;
+    top: 30px;
+    left: 30px;*/
+    width:100px;
+    height: 6px;
+}
+
+#volumeIcon {
+    background-image: url('/static/btns1.png');
+    display: inline-block;
+
+    width: 26px;
+    height: 23px;
+    margin: 0 3px 0 0;
+    opacity: 0.2;
+    cursor: default;
+    /*padding: 0 0 0 30px;*/
+    /*background-position: -132px -0px;*/
+}
+
+#volumeContainer .level3{ background-position: -132px -0px; }
+#volumeContainer .level2{ background-position: -132px -23px; }
+#volumeContainer .level1{ background-position: -132px -46px; }
+#volumeContainer .mute{ background-position: -160px -0px; }
 </style>
 {% endblock%}
 
 
 {% block content %}
 
-
-<div id="statusbar" style="position:relative; top: 400px; left: 300px; width:200px; height: 10px;">
-
-</div>
+<div id="volumeContainer">
+    <div id="volumeIcon" class="level3"></div>
+    <div id="volumeControl">
+    </div>
+</div
 
 <div>
 {% for task in tasks %}
@@ -1264,11 +1396,8 @@ $(function() {
                     
                         <textarea name="descbody"></textarea>
                         <div>
-                            <!-- <input type="range" name="priority"></input> -->
-                            <!-- <input type="text" name="priority"></input> -->
                             <input type="hidden" name="priority"></input>
                             <div class="priobar"></div>
-                            <!-- <input type="checkbox" name="use_markup"></input> -->
                             <div><a class="save">Save</a></div>
                         </div>
                     
