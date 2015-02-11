@@ -560,7 +560,7 @@ $(function() {
         lt.attr("id", "listtask"+data.id)
         lt.find(".todopriority > span").text(data.priority)
         lt.find(".todotitle > span").text(data.title)
-        return lt
+        return lt.get(0)
     }
 
 
@@ -588,6 +588,15 @@ $(function() {
     }
 
     var currentlyEditing
+
+
+    var containerElement = ltc.get(0)
+    containerElement.sortTimer = new MiniDaemon(containerElement, function(){
+        sortTasks()
+        this.sortTimer.pause()
+    }, 1300, Infinity);    
+
+
 
     function makeListTask(element){
         var lt = $(element)
@@ -644,12 +653,15 @@ $(function() {
             lt.setPriority(p)
             $.post("/api/listtask/"+id, { priority: p })
                 .done(function(data){
-                    sortTasks()
+                    // sortTasks()
+                    containerElement.sortTimer.pause()
+                    containerElement.sortTimer.start()
                 })
         })
 
         lt.find(".todopriority .minus").click(function(e){
             var p = lt.get(0).getPriority()
+            console.log(lt.get(0), p, id)
             // var next = lt.next().get(0)
             // if (next != undefined){
             //     p = next.getPriority()-1;
@@ -660,7 +672,9 @@ $(function() {
             lt.setPriority(p)
             $.post("/api/listtask/"+id, { priority: p })
                 .done(function(data){
-                    sortTasks()
+                    // sortTasks()
+                    containerElement.sortTimer.pause()
+                    containerElement.sortTimer.start()
                 })
         })
 
@@ -813,7 +827,7 @@ $(function() {
                 if (resp.status == "ok") {
                     var data = resp.data
                     var lt = createListTask(data)
-                    lt.appendTo(ltc)
+                    $(lt).appendTo(ltc)
                     makeListTask(lt)
                     sortTasks()
                     $("#addform > input").fadeOut()
@@ -1290,11 +1304,11 @@ $(function() {
                     
                         <textarea name="descbody"></textarea>
                         <div>
-
                             <!-- <input type="range" name="priority"></input> -->
                             <!-- <input type="text" name="priority"></input> -->
+                            <input type="hidden" name="priority"></input>
+                            <div class="priobar"></div>
                             <!-- <input type="checkbox" name="use_markup"></input> -->
-                            
                             <div><a class="save">Save</a></div>
                         </div>
                     
