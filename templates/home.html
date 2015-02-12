@@ -331,10 +331,8 @@ $(function() {
             if ((rmins % 5 == 0) && (rmins != this._prevSoundTime) && elapsed > 60){
                 if (rmins == 0) {
                     audioElement.setAttribute('src', '/static/FishBite.wav');
-                    audioElement.volume = 0.2
                 } else {
-                    audioElement.setAttribute('src', '/static/train.wav');
-                    audioElement.volume = 0.3
+                    audioElement.setAttribute('src', '/static/BullRush.ogg');
                 }
                 
                 audioElement.play()
@@ -346,6 +344,8 @@ $(function() {
                 elapsed = this.pomoDuration
                 this.pomoTimer.pause()
                 if (this.pomoState == "BREAK" || this.pomoState == "LONGBREAK"){
+                    audioElement.setAttribute('src', '/static/ConcussiveShotImpact.ogg');
+                    audioElement.play()
                     this.stop_break()
                 } else if (this.pomoState == "ACTIVE") {
                     this.updateServer("add_time", this.pomoLength)
@@ -409,9 +409,8 @@ $(function() {
                 // this.taskLastSync = Date.now()
                 // this.taskSyncPeriod = 1*60
 
-                this.progress.setColor(colors.inactive)
-
                 this._update(true)
+                this.progress.setColor(colors.inactive)
                 this.normalTimer.pause()
                 this.pomoTimer.pause()
                 this.clock.hide()
@@ -956,6 +955,21 @@ $(function() {
 
     $(vol.bg).on("mousedown", onmousedown) 
     $(vol.container).on("mousedown", onmousedown) 
+
+
+    $("#daystrip > div").each(function(){
+        $(this).click(function(e){
+            var self = $(this)
+            // console.log(self.data("date"))
+            if (self.hasClass("MISSED")){
+                self.removeClass("MISSED")
+                self.addClass("COMPLETE")
+            } else if (self.hasClass("COMPLETE")){
+                self.removeClass("COMPLETE")
+                self.addClass("MISSED")
+            }
+        })
+    })
 });
 </script>
 <style>
@@ -1333,6 +1347,51 @@ $(function() {
 #volumeContainer .level2{ background-position: -132px -23px; }
 #volumeContainer .level1{ background-position: -132px -46px; }
 #volumeContainer .mute{ background-position: -160px -0px; }
+
+
+#daystrip {
+    position: absolute;
+    top: 20px;
+    left: 580px;
+}
+
+#daystrip > div {
+    position: relative;
+    display: inline-block;
+    width: 25px;
+    height: 25px;
+    background-color: #444444;
+    vertical-align: middle;
+    margin: 0 5px 5px 0;
+    border: 3px solid #777777;
+}
+/*#daystrip .cday > * {
+    vertical-align: middle;
+}
+*/
+#daystrip .MISSED {
+    background-color: #080808;
+    border: 3px solid #0a0a0a;
+    color: #111111;
+}
+
+#daystrip .COMPLETE {
+    background-color: #105010;
+    border: 3px solid #107010;
+    color: #209020;
+}
+
+
+#daystrip > div > span {
+    font-family: "Arial", sans-serif;
+    font-weight: bold;
+    font-size: 15px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-55%, -55%);
+}
+
 </style>
 {% endblock%}
 
@@ -1445,4 +1504,14 @@ $(function() {
             </div>
             </form>
         </div>
+
+
+<div id="daystrip">
+{% for date, daydata in days %}
+    <div class="{% if daydata %} {{daydata.state}} {% else %} MISSED {% endif %}" data-date="{{date.isoformat()}}">
+        <span onselectstart="return false">{{date.day}}</span>
+    </div>
+{% endfor %}
+</div>
+
 {% endblock %}
