@@ -3,6 +3,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from logging.config import fileConfig
 
+# sys.path.append(os.getcwd())
 
 from app import db, app
 

@@ -41,6 +41,14 @@ class Day(db.Model):
     def __repr__(self):
         return self.date.strftime("%x")
 
+    def as_dict(self, markup=True):
+        return {
+            "id" : self.id,
+            "date" : self.date.isoformat(),
+            "state" : self.state,
+            "report" : self.report,
+        }
+
 
 class ListTask(db.Model):
     __tablename__ = 'listtasks'
@@ -220,6 +228,24 @@ def tasks():
                     listtasks=listtasks,
                     days=dayrange(d1, d2, query=days_query)
                     )
+
+
+@app.route('/api/day/<datestr>/', methods=['GET', 'POST'])
+def day_state(datestr):
+    if request.method == 'POST':
+        date = datetime.strptime(datestr, "%Y-%m-%d").date()
+        day = Day.query.filter(Day.date == date).first()
+        if not day:
+            day = Day()
+            day.date = date
+            db.session.add(day)
+
+        newstate = request.form['state']
+        day.state = newstate
+
+        db.session.commit()
+
+        return json_response("ok", day.as_dict(), 200)
 
 
 @app.route('/api/listtask/add', methods=['GET', 'POST'])
