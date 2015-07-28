@@ -31,6 +31,22 @@ db = SQLAlchemy(app)
 from markdown import markdown
 from flask import Markup
 
+class UserData(db.Model):
+    __tablename__ = 'userdata'
+    id = db.Column(db.Integer, primary_key=True)
+    day_start_date = db.Column(db.DateTime)
+    water_level = db.Column(db.Float, default=0)
+
+    def __repr__(self):
+        return self.date.strftime("%x")
+
+    def as_dict(self, markup=True):
+        return {
+            "id" : self.id,
+            "day_start_date" :  self.day_start_date.strftime("%s"),
+            "water_level" : self.water_level
+        }
+
 class Day(db.Model):
     __tablename__ = 'days'
     id = db.Column(db.Integer, primary_key=True)
@@ -159,6 +175,7 @@ class Task(db.Model):
 #flask-admin setup
 
 admin = Admin(app)
+admin.add_view(ModelView(UserData, db.session))
 admin.add_view(ModelView(Task, db.session))
 admin.add_view(ModelView(ListTask, db.session))
 admin.add_view(ModelView(Day, db.session))
@@ -247,6 +264,23 @@ def day_state(datestr):
 
         return json_response("ok", day.as_dict(), 200)
 
+
+@app.route('/api/userdata/day_start', methods=['GET', 'POST'])
+def day_start():
+    if request.method == 'POST':
+        # print('harro')
+        datetimestamp = int(float(request.form['day_start_date']))
+        print("harro", datetimestamp, request.form['day_start_date'])
+        date = datetime.fromtimestamp(datetimestamp)
+        # date = datetime.strptime(datestring, "%Y-%m-%dT%H:%M:%S.%fZ")
+        ud = UserData.query.get(1)
+        ud.day_start_date = date
+        db.session.commit()
+
+        return json_response("ok", ud.as_dict(), 200)
+    else:
+        ud = UserData.query.get(1)
+        return json_response("ok", ud.as_dict(), 200)
 
 @app.route('/api/listtask/add', methods=['GET', 'POST'])
 def listtask_add():

@@ -116,14 +116,17 @@ $(function() {
                     "height": "100%",
                     "width": "100%",
                     "border-radius": "3px",
-                    "background": "#660000"
+                    "background": "#660000",
+                    "position": "relative"
                 })
 
         $(this.bar).css({
                     "height": "100%",
-                    "width": "40%",
+                    "width": "100%",
                     "border-radius": "3px",
-                    "background": "#aa0000"
+                    "background": "#aa0000",
+                    "position": "absolute",
+                    "bottom": "0px"
                 })
 
 
@@ -155,10 +158,18 @@ $(function() {
     StatusBar.prototype.min = 0
     StatusBar.prototype.max = 1
     StatusBar.prototype.value = 0
+    StatusBar.prototype.orientation = "horizontal"
     StatusBar.prototype.newvalueHandler = function(){}
 
     StatusBar.prototype.onnewvalue = function(f){
         this.newvalueHandler = f
+    }
+
+    StatusBar.prototype.setOrientation = function(orientation){
+        this.orientation = orientation
+        $(this.bar).css("width", 100+"%")
+        $(this.bar).css("height", 100+"%")
+        this.setValue(this.value)
     }
 
     StatusBar.prototype.setColor = function(hex){
@@ -166,21 +177,93 @@ $(function() {
         $(this.bg).css("background", mulColor(hex, 0.5))
     }
 
+    StatusBar.prototype.getValue = function(){
+        return this.value
+    }
     StatusBar.prototype.setValue = function(val){
+        this.value = val
         var p = 100* ((val - this.min) / (this.max - this.min))
         if (p>100) { p = 100 }
         if (p<0) { p = 0 } // it looks ugly if any less
-        $(this.bar).css("width", p+"%")
+        if (this.orientation == "horizontal") {
+            $(this.bar).css("width", p+"%")
+        } else {
+            $(this.bar).css("height", p+"%")
+        }
     }
-    // StatusBar.prototype.setMinMaxValues = function(min,max){
-    //     this.min = min
-    //     this.max = max
-    //     this.setValue(this.value)
-    // }
+    StatusBar.prototype.setMinMaxValues = function(min,max){
+        this.min = min
+        this.max = max
+        this.setValue(this.value)
+    }
+
+
+
+    var wb = new StatusBar($("#waterblock > .barcont").get(0), true)
+    wb.setOrientation("vertical")
+    wb.setColor("1c56a6")
+    wb.setMinMaxValues(0,3)
+    wb.setValue(0.4)
+
+    var water = $("#waterblock")
+    water.find(".small").click(function(e){
+            wb.setValue(wb.getValue()+0.1)
+            e.preventDefault()
+        })
+    water.find(".big").click(function(e){
+            wb.setValue(wb.getValue()+0.5)
+            e.preventDefault()
+        })
+    water.find(".reset").click(function(e){
+            wb.setValue(0)
+            e.preventDefault()
+        })
+
+
+    
+
+    var DayStartButton = $("#startDayButton")
+    DayStartButton.click(function(e){
+        DayStartButton.day_start()
+        
+    })
+
+    $.getJSON("/api/userdata/day_start")
+                .done(function(resp){
+                    var data = resp.data
+                    DayStartButton.day_start_date = data.day_start_date*1000
+                    console.log("day_start", data)
+                })
+
+    DayStartButton.day_start = function (){
+        $(".task").each( function(index){
+            this.reset()
+            wb.setValue(0)
+        })
+
+        var now = Date.now()/1000
+
+        $.post("/api/userdata/day_start", { day_start_date: now })
+                .done(function(resp){
+                    console.log(resp)
+                    var data = resp.data
+                    DayStartButton.day_start_date = data.day_start_date*1000
+                })
+
+    }
 
 
     var Tasks = []
 
+    var DayStartTime = 0
+    var DayDaemon = new MiniDaemon($("task_container"), function(){
+        if (!DayStartButton.day_start_date) return;
+        for (var i=0; i<Tasks.length; i++) {
+            var task = Tasks[i]
+            task.warning_check()
+        }
+    }, 1000, Infinity);
+    DayDaemon.start()
 
 
     $(".task").each( function(index){
@@ -190,6 +273,8 @@ $(function() {
         this.taskId = id
         var task = this
 
+        task.taskState = "INACTIVE"
+        task.pomoState = "INACTIVE"
         task.pomoTime = 0
         task.pomoLength = 25
         // task.taskStartTime = 0
@@ -225,6 +310,8 @@ $(function() {
         clock.text = clockText
         this.clock = clock
         this.clockDiv = clockDiv
+        this.warningDiv = $(this).find(".warning")
+        this.warningDiv.hide()
 
         this.clock.show = function() {
             this.fadeTimer.pause()
@@ -256,7 +343,24 @@ $(function() {
         }
 
 
-
+        this.warning_check = function(){
+            var now = Date.now()
+            var task = this
+            // var elapsed = (now - DayStartTime ) / 1000
+            var elapsed = (now - DayStartButton.day_start_date)/1000
+            // console.log(Tasks)
+            if (task.suggestedStartTime != null) {
+                // console.log(elapsed, task.suggestedStartTime, task.taskState, task.pomoState)
+                if (elapsed > task.suggestedStartTime) {
+                    if (task.taskState == "INACTIVE" && task.pomoState == "INACTIVE") {
+                        task.warningDiv.show()
+                    } else {
+                        task.warningDiv.hide()
+                    }
+                    // console.log(task.id, "wake UP!")
+                }
+            }
+        }
 
         var colors = {
             break: genColor("8888FF"),
@@ -273,6 +377,11 @@ $(function() {
         this.pomoTimer = new MiniDaemon(this, function(){
             this._updatePomo()
         },50, Infinity)
+
+
+        var WarningDaemon = new MiniDaemon(containerElement, function(){
+            
+        }, 1000, Infinity);    
 
 
         this._update = function(bNoSync, bAnimate){
@@ -304,6 +413,7 @@ $(function() {
                 this.progress.set(p)
             }
 
+            this.warning_check()
         }
 
 
@@ -400,6 +510,7 @@ $(function() {
             }
         }
         this.stop_task = function(){
+            console.log(this.taskState)
             if (this.taskState == "ACTIVE" || this.taskState == "POMO"){
                 this.taskState = "INACTIVE"
                 this.pomoState= "INACTIVE"
@@ -446,6 +557,9 @@ $(function() {
             this._updatePomo()
             this.pomoTimer.pause()
             this.clock.fadeTimer.start()
+
+            $(this).find(".start").show()
+            $(this).find(".stop").hide()
         }
 
         this.reset = function(){
@@ -507,10 +621,15 @@ $(function() {
                     task.title = data.title
                     task.taskLength = data.task_length
                     task.taskTime = data.task_time
-                    task.taskState = data.task_state
+                    // task.taskState = data.task_state;
                     task.pomoTime = data.pomo_time
                     task.pomoLength = data.pomo_length
                     task.pomoBreakLength = data.pomo_break_length
+                    var hms = data.task_start_time
+                    var a = hms.split(':'); // split it at the colons
+
+                    var seconds = (+a[0]) * 60 * 60 + (+a[1]) * 60 + (+a[2]); 
+                    task.suggestedStartTime = seconds
                     // task.pomoState = data.pomoState
 
                     task.restore()
@@ -534,7 +653,7 @@ $(function() {
 
                     task.taskLength = data.task_length
                     task.taskTime = data.task_time
-                    task.taskState = data.task_state
+                    // task.taskState = data.task_state
                     task.pomoTime = data.pomo_time
                     task.pomoLength = data.pomo_length
                     task.pomoBreakLength = data.pomo_break_length
@@ -983,10 +1102,39 @@ $(function() {
             }
         })
     })
+
 });
 </script>
 <style>
 
+
+#task_container{
+    position: relative;
+    top: 5px;
+}
+
+#task_container > a {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    position: relative;
+    left: 200px;
+    font-weight: 400;
+    font-size: 29px;
+    font-family: "Ubuntu Condensed", sans-serif;
+    color: #090909;
+}
+#task_container > a:hover {
+    text-decoration: none;
+    color: #272a2c;
+}
+#task_container > a:active {
+    text-decoration: none;
+    color: #696a6c;
+}
 
 .task > * {
     display: inline-block;
@@ -1003,6 +1151,15 @@ $(function() {
     margin-left: 20px;
     font-size: 15px;
     font-family: "PT Sans Narrow", sans-serif;
+}
+
+.task .warning {
+    position:relative;
+    left: -80px;
+    top: 20px;
+    width: 130px;
+    height: 130px;
+    background-image: url('/static/warning.png');
 }
 
 .task .clock {
@@ -1039,7 +1196,7 @@ $(function() {
 .task .pbcont {
     vertical-align: top;
     padding: 10px 10px 10px 10px;
-    margin: 30px 0 0 0;
+    margin: 10px 0 0 0;
 }
 
 .task .pbcont a {
@@ -1090,7 +1247,7 @@ $(function() {
 
 #listtask_container {
     position: absolute;
-    left: 550px;
+    left: 600px;
     top: 70px;
 }
 
@@ -1365,7 +1522,7 @@ $(function() {
 #daystrip {
     position: absolute;
     top: 20px;
-    left: 580px;
+    left: 630px;
 }
 
 #daystrip > div {
@@ -1411,6 +1568,58 @@ $(function() {
     transform: translate(-55%, -55%);
 }
 
+#waterblock {
+    position: absolute;
+    top: 20px;
+    left: 570px;
+}
+
+#waterblock > .barcont{
+    height: 230px;
+    width: 10px;
+    border-radius: 9px;
+    background-color: #090909;
+    padding: 10px 10px 10px 10px;
+}
+
+
+#waterblock .buttons {
+    width: 50px;
+    position: relative;
+    left: -2px;
+    top: 20px;
+}
+
+#waterblock .buttons > a {
+    display: inline-block;
+    /*background-image: url('/static/todobtns.png');*/-
+    width: 50px;
+    /*height: 50px;*/
+    /*line-height: 100p-x;*/
+
+    font-family: "Ubuntu Condensed", sans-serif;
+    font-size: 15px;
+    color: #6d6e71;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+#waterblock .buttons > a:hover {
+        text-decoration: none;
+        color: #a7a9ac;
+}
+
+#waterblock .buttons > a:active {
+        text-decoration: none;
+        color: #e7e8e9;
+}
+
+/*#waterblock {*/-
+
 </style>
 {% endblock%}
 
@@ -1422,11 +1631,10 @@ $(function() {
     <div id="volumeIcon" class="level3"></div>
     <div id="volumeControl">
     </div>
-</div
-
-<div>
+</div>
+<div id="task_container">
+<a id="startDayButton">Start the Day</a>
 {% for task in tasks %}
-
     <div id="task{{ task.id }}" class="task">
         <div class="pbcont">
             <div><span class="title">{{task.title}}</span><span class="duration"></span></div>
@@ -1437,6 +1645,8 @@ $(function() {
             <a src="" class="pomo"><span>Pomodoro</span></a>
         </div>
         <div class="clock">
+        </div>
+        <div class="warning">
         </div>
     </div>
 
@@ -1532,6 +1742,17 @@ $(function() {
         <span onselectstart="return false">{{date.day}}</span>
     </div>
 {% endfor %}
+</div>
+
+
+<div id="waterblock">
+    <div class="barcont" style="">
+    </div>
+    <div class="buttons">
+         <a class="small">100ml</a>
+         <a class="big">500ml</a>
+         <a class="reset">Reset</a>
+    </div>
 </div>
 
 {% endblock %}
