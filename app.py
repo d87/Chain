@@ -239,11 +239,18 @@ def tasks():
     d1 = today - timedelta(days=3)
     d2 = today + timedelta(days=3)
     days_query = Day.query.filter(Day.date >= d1).filter(Day.date < d2).order_by(Day.date).all()
+    # ud = UserData.query.get(1)
+    # if not ud:
+    #     ud = UserData()
+    #     ud.day_start_date = datetime.now()
+    #     db.session.add(ud)
+    #     db.session.commit()
 
     return render_template("home.html",
                     tasks=tasks,
                     listtasks=listtasks,
                     days=dayrange(d1, d2, query=days_query)
+                    # day_start_date=us
                     )
 
 
@@ -268,19 +275,18 @@ def day_state(datestr):
 @app.route('/api/userdata/day_start', methods=['GET', 'POST'])
 def day_start():
     if request.method == 'POST':
-        # print('harro')
         datetimestamp = int(float(request.form['day_start_date']))
-        print("harro", datetimestamp, request.form['day_start_date'])
         date = datetime.fromtimestamp(datetimestamp)
         # date = datetime.strptime(datestring, "%Y-%m-%dT%H:%M:%S.%fZ")
-        ud = UserData.query.get(1)
+        ud = UserData.query.all()[0]
         ud.day_start_date = date
         db.session.commit()
 
         return json_response("ok", ud.as_dict(), 200)
     else:
-        ud = UserData.query.get(1)
-        if not ud:
+        try:
+            ud = UserData.query.all()[0]
+        except IndexError:
             ud = UserData()
             ud.day_start_date = datetime.now()
             db.session.add(ud)

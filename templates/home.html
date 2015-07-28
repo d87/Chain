@@ -203,7 +203,7 @@ $(function() {
     wb.setOrientation("vertical")
     wb.setColor("1c56a6")
     wb.setMinMaxValues(0,3)
-    wb.setValue(0.4)
+    wb.setValue(0)
 
     var water = $("#waterblock")
     water.find(".small").click(function(e){
@@ -232,7 +232,6 @@ $(function() {
                 .done(function(resp){
                     var data = resp.data
                     DayStartButton.day_start_date = data.day_start_date*1000
-                    console.log("day_start", data)
                 })
 
     DayStartButton.day_start = function (){
@@ -262,7 +261,7 @@ $(function() {
             var task = Tasks[i]
             task.warning_check()
         }
-    }, 1000, Infinity);
+    }, 300000, Infinity);
     DayDaemon.start()
 
 
@@ -350,10 +349,14 @@ $(function() {
             var elapsed = (now - DayStartButton.day_start_date)/1000
             // console.log(Tasks)
             if (task.suggestedStartTime != null) {
-                // console.log(elapsed, task.suggestedStartTime, task.taskState, task.pomoState)
+                console.log(elapsed, now, DayStartButton.day_start_date, task.suggestedStartTime, task.taskState, task.pomoState)
                 if (elapsed > task.suggestedStartTime) {
                     if (task.taskState == "INACTIVE" && task.pomoState == "INACTIVE") {
                         task.warningDiv.show()
+                        for (var i=0; i<20; i++){
+                            task.warningDiv.animate({opacity: 1 }, 500)
+                            task.warningDiv.animate({opacity: 0.5 }, 500)
+                        }
                     } else {
                         task.warningDiv.hide()
                     }
