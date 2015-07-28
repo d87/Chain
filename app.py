@@ -280,6 +280,11 @@ def day_start():
         return json_response("ok", ud.as_dict(), 200)
     else:
         ud = UserData.query.get(1)
+        if not ud:
+            ud = UserData()
+            ud.day_start_date = datetime.now()
+            db.session.add(ud)
+            db.session.commit()
         return json_response("ok", ud.as_dict(), 200)
 
 @app.route('/api/listtask/add', methods=['GET', 'POST'])
