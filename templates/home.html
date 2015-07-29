@@ -260,7 +260,7 @@ $(function() {
             var task = Tasks[i]
             task.warning_check()
         }
-    }, 300000, Infinity);
+    }, 600000, Infinity);
     DayDaemon.start()
 
 
@@ -372,7 +372,7 @@ $(function() {
             break: genColor("8888FF"),
             active: genColor("33BB33"),
             inactive: genColor("995555"),
-            complete: genColor("009900"),
+            complete: genColor("005500"),
             inprogress: genColor("d16a1e")
         }
         this.progress.setColor(colors.inactive)
@@ -400,6 +400,7 @@ $(function() {
                 this.normalTimer.pause()
                 if (!bNoSync) this.updateServer("add_time", (this.taskLength - this.taskTime).toFixed(0) );
                 this.progress.setColor(colors.complete)
+                this.taskState = "COMPLETE"
             } else if (elapsed > this.taskSyncPeriod) {
                 if (!bNoSync) {
                     this.updateServer("add_time", this.taskSyncPeriod);
@@ -1758,5 +1759,7 @@ $(function() {
          <a class="reset">Reset</a>
     </div>
 </div>
+
+<div></div>
 
 {% endblock %}
