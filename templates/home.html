@@ -235,11 +235,6 @@ $(function() {
                 })
 
     DayStartButton.day_start = function (){
-        $(".task").each( function(index){
-            this.reset()
-            wb.setValue(0)
-        })
-
         var now = Date.now()/1000
 
         $.post("/api/userdata/day_start", { day_start_date: now })
@@ -247,6 +242,10 @@ $(function() {
                     console.log(resp)
                     var data = resp.data
                     DayStartButton.day_start_date = data.day_start_date*1000
+                    $(".task").each( function(index){
+                        this.reset()
+                        wb.setValue(0)
+                    })
                 })
 
     }
@@ -293,6 +292,9 @@ $(function() {
         this.normalTimer = new MiniDaemon(this, function(){
             this._update()
         },50, Infinity)
+
+        var audioElement = $("audio").get(0)//document.createElement('audio');
+        audioElement.setAttribute('src', '/static/RadioStartFaded.wav');
 
 
         var clockDiv = $(this).find('.clock')
@@ -350,18 +352,19 @@ $(function() {
             // console.log(Tasks)
             if (task.suggestedStartTime != null) {
                 console.log(elapsed, now, DayStartButton.day_start_date, task.suggestedStartTime, task.taskState, task.pomoState)
-                if (elapsed > task.suggestedStartTime) {
-                    if (task.taskState == "INACTIVE" && task.pomoState == "INACTIVE") {
+                if ((elapsed > task.suggestedStartTime) &&
+                    (task.taskState == "INACTIVE" && task.pomoState == "INACTIVE")) {
                         task.warningDiv.show()
+                        audioElement.setAttribute('src', '/static/Curse.ogg');
+                        audioElement.play()
                         for (var i=0; i<20; i++){
                             task.warningDiv.animate({opacity: 1 }, 500)
-                            task.warningDiv.animate({opacity: 0.5 }, 500)
+                            task.warningDiv.animate({opacity: 0.3 }, 500)
                         }
-                    } else {
-                        task.warningDiv.hide()
-                    }
-                    // console.log(task.id, "wake UP!")
+                } else {
+                    task.warningDiv.hide()
                 }
+                    // console.log(task.id, "wake UP!")
             }
         }
 
@@ -373,9 +376,6 @@ $(function() {
             inprogress: genColor("d16a1e")
         }
         this.progress.setColor(colors.inactive)
-
-        var audioElement = $("audio").get(0)//document.createElement('audio');
-        audioElement.setAttribute('src', '/static/RadioStartFaded.wav');
 
         this.pomoTimer = new MiniDaemon(this, function(){
             this._updatePomo()
@@ -442,9 +442,9 @@ $(function() {
             var rmins = Math.ceil(remains/60)
             if ((rmins % 5 == 0) && (rmins != this._prevSoundTime) && elapsed > 60){
                 if (rmins == 0) {
-                    audioElement.setAttribute('src', '/static/FishBite.wav');
+                    audioElement.setAttribute('src', '/static/DevotionAura.ogg');
                 } else {
-                    audioElement.setAttribute('src', '/static/train.wav');
+                    audioElement.setAttribute('src', '/static/Deathknight_PlagueStrike2.ogg');
                 }
                 
                 audioElement.play()
@@ -1113,18 +1113,19 @@ $(function() {
 
 #task_container{
     position: relative;
-    top: 5px;
+    top: 50px;
 }
 
-#task_container > a {
+#startDayButton {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    position: relative;
+    position: absolute;
     left: 200px;
+    top: -40px;
     font-weight: 400;
     font-size: 29px;
     font-family: "Ubuntu Condensed", sans-serif;
