@@ -5,6 +5,112 @@
 <script>
 $(function() {
 
+
+    // function makeguid() {
+    //   function s4() {
+    //     return Math.floor((1 + Math.random()) * 0x10000)
+    //       .toString(16)
+    //       .substring(1);
+    //   }
+    //   return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+    //     s4() + '-' + s4() + s4() + s4();
+    // }
+
+    // var sessionID = makeguid()
+    // var pollingID = 1
+    // console.log(sessionID)
+
+    // var EventPolling = new MiniDaemon($("head"), function(){
+    //     $.post("/api/events", { sessionID: sessionID, pollingID: pollingID })
+    //             .done(function(resp){
+    //                 pollingID++;
+    //                 // var data = resp.data
+    //                 // console.log(resp)
+    //             })
+    // }, 6000, Infinity);
+    // EventPolling.start()
+
+
+    // var eventSource = new EventSource("http://nevihta.d87:4001/stream", { withCredentials: true });
+    var eventSource = new EventSource("/sse/stream");
+    // eventSource.onmessage = function(e) {
+        // console.log(e.data);
+    // };
+    eventSource.onopen = function(e) {
+      console.log("Connected to event source");
+    };
+    eventSource.onerror = function(e) {
+        if (this.readyState == EventSource.CONNECTING) {
+            console.log("Event source disconnected, retrying...");
+        } else {
+            console.log("Error, code: " + this.readyState);
+        }
+    };
+
+    var fixedColors = {
+        "Mozilla Firefox": "#c63011",
+        "chrome.exe": "#c63011",
+        "vivaldi.exe": "#c63011",
+        "mpc-hc.exe": "#a00808",
+        "YouTube": "#c21212",
+        "Telegram.exe": "#5092c9",
+        "ZBrush64.exe": "#c95089",
+        "foobar2000": "#7d5d73",
+        "HeroesOfTheStorm.exe": "#6122d5",
+        "sublime_text.exe": "#453e35",
+        "Photoshop.exe": "#211f63",
+        "ACDSee": "#3db246"
+    }
+    var getChartColor = function(title){
+        if (fixedColors[title]) {
+            return fixedColors[title]
+        }
+        return rgbToHex(Math.random()*150, Math.random()*150, Math.random()*150)
+        //normally multiplier goes up to 255, but random colors should not be so bright
+    }
+
+    eventSource.addEventListener("ACTIVITY_UPDATE", function(e){
+        console.log(e.event)
+        console.log(e.data)
+        var data = JSON.parse(e.data)
+
+        while (ActivityDoughnutChart.segments.length > 0)
+            ActivityDoughnutChart.removeData()
+
+        var sortingArray = []
+        for(var title in data.log){
+            var seconds = data.log[title]
+            sortingArray.push([title, seconds])
+        }
+        sortingArray.sort(function(a,b){ return a[1] < b[1] })
+        for (var i=0; i < sortingArray.length; i++){
+            var title = sortingArray[i][0]
+            var seconds = sortingArray[i][1]
+            ActivityDoughnutChart.addData({
+                value: seconds,
+                color: getChartColor(title),
+                highlight: "#e88deb",
+                label: title + " " + g_formatTime(seconds)
+            })
+        }
+        ActivityDoughnutChart.update()
+    })
+
+    // Get the context of the canvas element we want to select
+    var ctx = document.getElementById("ActivityChart").getContext("2d");
+    ActivityDoughnutChart = new Chart(ctx).Doughnut([], {
+        //Boolean - Whether we should show a stroke on each segment
+        segmentShowStroke : true,
+        //String - The colour of each segment stroke
+        segmentStrokeColor : "#090909",
+        //Number - The width of each segment stroke
+        segmentStrokeWidth : 2,
+        //Number - The percentage of the chart that we cut out of the middle
+        percentageInnerCutout : 35, // This is 0 for Pie charts
+    });
+
+
+
     function componentToHex(c) {
         var hex = c.toString(16);
         return hex.length == 1 ? "0" + hex : hex;
@@ -23,6 +129,43 @@ $(function() {
         b = parseInt(b)
         return componentToHex(r) + componentToHex(g) + componentToHex(b);
     }
+
+    var formatTime = function(s){
+            if (s >= 3600) {
+                return Math.ceil(s / 3600)+"h"
+            } else if (s >= 60) {
+                return Math.ceil(s / 60)+"m"
+            } else if (s >= 10) {
+                return Math.floor(s)+"s"
+            }
+            return s.toFixed(1)
+        }
+
+    var formatTime2 = function(ms){
+            if (ms >= 600000) {
+                return Math.ceil(ms / 60000)+"m"
+            } else {
+                var m = parseInt(ms / 60000)
+                var s = parseInt((ms % 60000) / 1000)
+                if (s < 10) { s = "0"+s }
+                // var ms = parseInt((ms % 1000) / 100)
+                return m+":"+s
+            }
+        }
+
+    g_formatTime = formatTime
+
+    var dueTime = function(baseTime, seconds){
+            var date = new Date( baseTime+ (seconds*1000))
+            var hours = date.getHours();
+            var minutes = "0" + date.getMinutes();
+            // console.log(date)
+            // var seconds = "0" + date.getSeconds();
+
+            // will display time in 10:30:23 format
+            var formattedTime = hours + ':' + minutes.substr(-2)
+            return formattedTime
+        }
 
     var mulColor = function (hex, mul) {
         // hex to rgb
@@ -139,9 +282,9 @@ $(function() {
         //     }
 
         //     var removeHandlers = function(e){
-        //             $(this).off("mousemove")
-        //             $(this).off("mouseup")
-        //         }
+        //         $(this).off("mousemove")
+        //         $(this).off("mouseup")
+        //     }
 
         //     $(this.bg).on("mousedown", function(e){
         //         barClick(e)
@@ -165,10 +308,20 @@ $(function() {
         this.newvalueHandler = f
     }
 
-    StatusBar.prototype.setOrientation = function(orientation){
+    StatusBar.prototype.setOrientation = function(orientation, attachPoint){
         this.orientation = orientation
-        $(this.bar).css("width", 100+"%")
-        $(this.bar).css("height", 100+"%")
+        var bar = $(this.bar)
+        bar.css("width", 100+"%")
+        bar.css("height", 100+"%")
+        if (orientation == "vertical" && attachPoint == "top"){
+            bar.css("bottom", "")
+            bar.css("top", "0px")
+            bar.css("left", "0px")
+        } else {
+            bar.css("bottom", "0px")
+            bar.css("top", "")
+            bar.css("left", "0px")
+        }
         this.setValue(this.value)
     }
 
@@ -199,11 +352,30 @@ $(function() {
 
 
 
+
     var wb = new StatusBar($("#waterblock > .barcont").get(0), true)
     wb.setOrientation("vertical")
     wb.setColor("1c56a6")
     wb.setMinMaxValues(0,3)
-    wb.setValue(0)
+    var initial_water = {{ userdata.water_level }}
+    wb.setValue(initial_water)
+
+    wb.saveTimer = new MiniDaemon(wb, function(){
+        $.post("/api/userdata/water_level", { water_level: wb.getValue() })
+                .done(function(resp){
+                    console.log(resp)
+                })
+        
+        this.saveTimer.pause()
+    }, 2000, Infinity);
+
+    wb._setValue = wb.setValue
+    wb.setValue = function(v){
+        this._setValue(v)
+        wb.saveTimer.pause()
+        wb.saveTimer.start()
+    }
+
 
     var water = $("#waterblock")
     water.find(".small").click(function(e){
@@ -211,7 +383,7 @@ $(function() {
             e.preventDefault()
         })
     water.find(".big").click(function(e){
-            wb.setValue(wb.getValue()+0.5)
+            wb.setValue(wb.getValue()+0.25)
             e.preventDefault()
         })
     water.find(".reset").click(function(e){
@@ -220,19 +392,55 @@ $(function() {
         })
 
 
+    var sound = water.find("audio").get(0)
+    sound.setAttribute('src', '/static/water_loop2.mp3');
+    sound.volume = 0.02
+    // sound.setAttribute('loop', 'true')
+
+    var waterTimer = new MiniDaemon(wb, function(){
+        var now = Date.now()
+        var elapsed = now - DayStartButton.day_start_date
+        var day_progress = elapsed / (16*60*60*1000)
+        var water_progress = wb.getValue()/2 //2 liters
+
+        if (water_progress + 0.1 < day_progress){
+            sound.play()
+        }
+
+    }, 60*60*1000, Infinity);
+    waterTimer.start()
+
+
+    eventSource.addEventListener("WATER_UPDATE", function(e){
+        var data = JSON.parse(e.data)
+        if (data.amount) {
+            wb.setValue(wb.getValue()+data.amount)
+        }
+    })
+
+
     
 
     var DayStartButton = $("#startDayButton")
     DayStartButton.click(function(e){
         DayStartButton.day_start()
-        
     })
 
-    $.getJSON("/api/userdata/day_start")
-                .done(function(resp){
-                    var data = resp.data
-                    DayStartButton.day_start_date = data.day_start_date*1000
-                })
+    eventSource.addEventListener("LEAVING_SLEEP", function(e){
+        console.log(e.event)
+        globalAudio.setAttribute('src', '/static/VO_GVG_085_Play_01.mp3');
+        globalAudio.play()
+        DayStartButton.day_start()
+    })
+
+    DayStartButton.day_start_date = {{ userdata.day_start_date.strftime("%s") }}*1000
+
+    // $.getJSON("/api/userdata/day_start")
+    //             .done(function(resp){
+    //                 // console.log(resp)
+    //                 var data = resp.data
+    //                 DayStartButton.day_start_date = data.day_start_date*1000
+    //             })
 
     DayStartButton.day_start = function (){
         var now = Date.now()/1000
@@ -244,11 +452,31 @@ $(function() {
                     DayStartButton.day_start_date = data.day_start_date*1000
                     $(".task").each( function(index){
                         this.reset()
-                        wb.setValue(0)
+                        $(this).find(".duration").text(formatTime(this.taskLength) + " @"+dueTime(DayStartButton.day_start_date, this.suggestedStartTime))
                     })
+                    wb.setValue(0)
+                    timeline.update()
                 })
 
     }
+
+    timeline = new StatusBar($("#timeline > .bar").get(0), true)
+    timeline.setOrientation("vertical", "top")
+    timeline.setColor("431c5b")
+    timeline.setMinMaxValues(0, 16*60*60*1000) // 16 hours
+    timeline.setValue(0.5)
+
+    timeline.update = function(){
+        var now = Date.now()
+        var elapsed = now - DayStartButton.day_start_date
+        this.setValue(elapsed)
+    }
+
+    var timelineTimer = new MiniDaemon(timeline, function(){
+        this.update()
+    }, 60000, Infinity);
+    timeline.update()
+    timelineTimer.start()
 
 
     var Tasks = []
@@ -309,6 +537,7 @@ $(function() {
         clockText.appendTo(clockDiv)
         clockText.text("0")
         clock.text = clockText
+        clock.task = task
         this.clock = clock
         this.clockDiv = clockDiv
         this.warningDiv = $(this).find(".warning")
@@ -318,14 +547,14 @@ $(function() {
             this.fadeTimer.pause()
             clockDiv.css("visibility", "visible")
         }
-        this.clock.hide = function(){
-            clockDiv.css("visibility", "hidden")
-        }
+        this.clock.hide = function(){ clockDiv.css("visibility", "hidden") }
+        this.clock.is_visible = function() { return clockDiv.is(":visible") }
         this.clock.hide()
 
 
         this.clock.fadeTimer = new MiniDaemon(this.clock, function(){
             this.hide()
+            this.task._update()
             this.fadeTimer.pause()
         }, 5000, Infinity);
 
@@ -351,9 +580,9 @@ $(function() {
             var elapsed = (now - DayStartButton.day_start_date)/1000
             // console.log(Tasks)
             if (task.suggestedStartTime != null) {
-                console.log(elapsed, now, DayStartButton.day_start_date, task.suggestedStartTime, task.taskState, task.pomoState)
+                // console.log(elapsed, now, DayStartButton.day_start_date, task.suggestedStartTime, task.taskState, task.pomoState)
                 if ((elapsed > task.suggestedStartTime) &&
-                    (task.taskState == "INACTIVE" && task.pomoState == "INACTIVE")) {
+                    (task.taskState == "INACTIVE" && task.pomoState == "INACTIVE" && task.clock.is_visible())) {
                         task.warningDiv.show()
                         audioElement.setAttribute('src', '/static/Curse.ogg');
                         audioElement.play()
@@ -392,7 +621,9 @@ $(function() {
             var now = Date.now()
             var elapsed = (now - this.taskStartTime ) / 1000
             if (bNoSync) elapsed = 0;
+            if (this.taskStartTime == undefined) elapsed = 0;
             var p = (elapsed + this.taskTime) / this.taskLength
+            console.log(this.taskId, this.taskStartTime, elapsed, this.taskTime, elapsed + this.taskTime, this.taskLength)
             var remains = this.taskLength - elapsed
             if (remains <= 0) remains = 0;
             if (p>=1) {
@@ -420,17 +651,6 @@ $(function() {
             this.warning_check()
         }
 
-
-        var formatTime = function(s){
-            if (s >= 3600) {
-                return Math.ceil(s / 3600)+"h"
-            } else if (s >= 60) {
-                return Math.ceil(s / 60)+"m"
-            } else if (s >= 10) {
-                return Math.floor(s)+"s"
-            }
-            return s.toFixed(1)
-        }
 
         this._updatePomo = function(){
             var now = Date.now()
@@ -514,7 +734,7 @@ $(function() {
             }
         }
         this.stop_task = function(){
-            console.log(this.taskState)
+            // console.log(this.taskState)
             if (this.taskState == "ACTIVE" || this.taskState == "POMO"){
                 this.taskState = "INACTIVE"
                 this.pomoState= "INACTIVE"
@@ -609,9 +829,11 @@ $(function() {
         });
 
 
+        
+
         this.restore = function(){
             $(this).find(".title").text(this.title)
-            $(this).find(".duration").text(formatTime(this.taskLength))
+            $(this).find(".duration").text(formatTime(this.taskLength) + " @"+dueTime(DayStartButton.day_start_date, this.suggestedStartTime))
             this._update(true)
         }
 
@@ -760,9 +982,11 @@ $(function() {
 
         lt.mouseenter(function(e){
             lt.buttons.css("visibility", "visible")
+            lt.buttons.css("display", "inline-block")
             lt.pbuttons.css("visibility", "visible")
         }).mouseleave(function(e){
             lt.buttons.css("visibility", "hidden")
+            lt.buttons.css("display", "none")
             lt.pbuttons.css("visibility", "hidden")
         })
 
@@ -846,6 +1070,25 @@ $(function() {
             lt.find(".edit_hide").css("display", "block")
         }
 
+        lt.find(".color").spectrum({
+            allowEmpty: true,
+            preferredFormat: "hex",
+            showPaletteOnly: true,
+            change: function(c){
+                lt.find(".todotitle > input[name=title]").css("color", c.toHexString())
+            },
+            palette: [
+                ["#777","#444","#666","#999","#ccc","#eee","#f3f3f3","#fff"],
+                ["#f00","#f90","#ff0","#0f0","#0ff","#00f","#90f","#f0f"],
+                ["#f4cccc","#fce5cd","#fff2cc","#d9ead3","#d0e0e3","#cfe2f3","#d9d2e9","#ead1dc"],
+                ["#ea9999","#f9cb9c","#ffe599","#b6d7a8","#a2c4c9","#9fc5e8","#b4a7d6","#d5a6bd"],
+                ["#e06666","#f6b26b","#ffd966","#93c47d","#76a5af","#6fa8dc","#8e7cc3","#c27ba0"],
+                ["#c00","#e69138","#f1c232","#6aa84f","#45818e","#3d85c6","#674ea7","#a64d79"],
+                ["#900","#b45f06","#bf9000","#38761d","#134f5c","#0b5394","#351c75","#741b47"],
+                ["#600","#783f04","#7f6000","#274e13","#0c343d","#073763","#20124d","#4c1130"]
+            ]
+        });
+
         lt.find(".edit").click(function(e){
             if (currentlyEditing == lt) {
                 lt.cancelEdit()
@@ -865,6 +1108,11 @@ $(function() {
                     lt.statusbar.setValue(p)
                     var newcolor = GetGradientColor(p).substring(1) // strip leading #
                     lt.statusbar.setColor(newcolor)
+                    if (data.color != "") {
+                        data.color = "#"+data.color
+                    }
+                    lt.find(".color").spectrum("set", data.color)
+                    lt.find(".todotitle > input[name=title]").css("color", data.color)
 
                     lt.toggleExpand(true)
                     lt.find(".edit_show").css("display", "block")
@@ -886,6 +1134,8 @@ $(function() {
             }); 
 
             if (formdata["title"].length == 0) { return }
+            if (formdata["color"] == "#777777") { formdata["color"] = "" }
+            formdata["color"] = formdata["color"].substring(1) // strip leading #
 
             $.post("/api/listtask/"+id+"/edit", formdata)
                 .done(function(resp){
@@ -897,6 +1147,9 @@ $(function() {
                         var data = resp.data
                         lt.find(".descpanel .description").html(data.description)
                         lt.setPriority(data.priority)
+                        if (data.color != "") { data.color = "#"+data.color }
+                        // lt.find(".todotitle > input").css("color", "#"+data.color)
+                        lt.find(".todotitle > span").css("color", data.color)
                         lt.find(".todotitle span").text(data.title)
                         sortTasks()
 
@@ -1044,7 +1297,8 @@ $(function() {
     vol.setValue(p)
     updateVolumeIcon(vol, p)
 
-    $("audio").get(0).volume = p
+    var globalAudio = $("audio").get(0)
+    globalAudio.volume = p
 
     var barClick = function(e){
         var el = draggingElement // e.currentTarget
@@ -1107,523 +1361,80 @@ $(function() {
         })
     })
 
+
+
+
+    var tcont = $("#TimerContainer")
+    var tcount = 1
+    makeTimer = function(timecode){
+        var min = parseInt(timecode / 100)
+        var sec = timecode % 100
+        var total_time = min * 60 + sec
+
+
+        var timer = $('<div> <span></span> <div class="buttons"> \
+             <a class="small">100ml</a> \
+             <a class="big">250ml</a> \
+             <a class="reset">Reset</a> \
+        </div> </div>') //createElement with attributes
+        timer.addClass("usertimer")
+        tcount++;
+        timer.appendTo(tcont)
+
+
+        timer.text = timer.find("span")
+        timer.time_goal = total_time*1000
+        timer.elapsed = 0
+
+        var lastTickTime = 0;
+        timer.daemon = new MiniDaemon(timer, function(){
+            var now = Date.now()
+            this.elapsed += ( now - lastTickTime)
+            lastTickTime = now
+
+            var remains = this.time_goal - this.elapsed
+            // console.log(remains
+
+            if (remains <= 0) {
+                this.addClass("expired")
+                this.text.text("-"+formatTime2(-remains))
+                // this.daemon.pause()
+                //glow now
+            } else {
+                this.text.text(formatTime2(remains))
+            }
+        }, 100)
+
+        timer.start = function(){
+            this.removeClass("expired")
+            var now = Date.now()
+            lastTickTime = now
+            this.daemon.start()
+        }
+
+        timer.start()
+
+        return timer
+    }
+
+
+    // var quoteElement = $("#quote_cont > blockquote")
+    // var quotes = [
+    // ]
+    // quoteElement.update = function(){
+    //     var quote = quotes[Math.floor(Math.random()*quotes.length)];
+    //     $(this).text(quote)
+    // }
+    // var quoteUpdateTimer = new MiniDaemon(quoteElement, function(){
+    //     quoteElement.update()
+    // }, 6*60*60*1000)
+    // // quoteElement.hide()
+    // quoteElement.update()
+    // quoteUpdateTimer.start()
+
 });
 </script>
 <style>
-
-
-#task_container{
-    position: relative;
-    top: 50px;
-}
-
-#startDayButton {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    position: absolute;
-    left: 200px;
-    top: -40px;
-    font-weight: 400;
-    font-size: 29px;
-    font-family: "Ubuntu Condensed", sans-serif;
-    color: #090909;
-}
-#task_container > a:hover {
-    text-decoration: none;
-    color: #272a2c;
-}
-#task_container > a:active {
-    text-decoration: none;
-    color: #696a6c;
-}
-
-.task > * {
-    display: inline-block;
-    /*font-width: normal;*/
-    /*font-family: "PT Sans Narrow", sans-serif;*/
-}
-
-.task .title {
-    font-weight: 400;
-    font-size: 25px;
-    font-family: "Ubuntu Condensed", sans-serif;
-}
-.task .duration {
-    margin-left: 20px;
-    font-size: 15px;
-    font-family: "PT Sans Narrow", sans-serif;
-}
-
-.task .warning {
-    position:relative;
-    left: -80px;
-    top: 20px;
-    width: 130px;
-    height: 130px;
-    background-image: url('/static/warning.png');
-}
-
-.task .clock {
-    position:relative;
-    left: 50px;
-    top: 20px;
-    width: 130px;
-    height: 130px;
-}
-
-.task .clock span{
-    position: absolute;
-    /*This works because position: absolute means something
-    like "use top, right, bottom, left to position yourself in relation to the nearest ancestor
-    who has position: absolute or position: relative*/
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 30px;
-    font-width: 100;
-    font-family: "PT Sans Narrow", sans-serif;
-    /*transform: translate(-50%, -50%);*/
-}
-
-.task .progressbar {
-    /*display: inline-block;*/
-    width: 300px;
-    height: 20px;
-    padding: 10px 10px 10px 10px;
-    background-color: #090909;
-    margin: 10px 0 10px 0;
-}
-
-.task .pbcont {
-    vertical-align: top;
-    padding: 10px 10px 10px 10px;
-    margin: 10px 0 0 0;
-}
-
-.task .pbcont a {
-    background-image: url('/static/btns1.png');
-    display: inline-block;
-
-    font-family: "PT Sans Narrow", sans-serif;
-    font-size: 15px;
-    color: #79797a;
-
-    width: 24px;
-    height: 23px;
-    margin: 0 50px 0 0;
-    vertical-align: bottom;
-    cursor: pointer;
-}
-.task .pbcont a:hover {
-    color: #a7a9ac;
-    text-decoration: none;
-}
-.task .pbcont a:active {
-    color: #e7e8e9;
-    text-decoration: none;
-}
-.task .pbcont a span {
-    padding: 0 0 0 30px;
-    position: relative;
-    top: 5px;
-    vertical-align: bottom;
-}
-
-.pomo { background-position: -78px 0px; }
-.pomo:hover { background-position: -78px -23px; }
-.pomo:active { background-position: -78px -46px; }
-
-.start { background-position: -27px 0px; }
-.start:hover { background-position: -27px -23px; }
-.start:active { background-position: -27px -46px; }
-
-.stop { background-position: -104px 0px; }
-.stop:hover { background-position: -104px -23px; }
-.stop:active { background-position: -104px -46px; }
-
-.reset { background-position: -1px 0px; }
-.reset:hover { background-position: -1px -23px; }
-.reset:active { background-position: -1px -46px; }
-
-
-#listtask_container {
-    position: absolute;
-    left: 600px;
-    top: 70px;
-}
-
-.listtask {
-    font-family: "Arial", sans-serif;
-    padding-left: 17px;
-    /*height: 20px;*/
-    width: 450px;
-}
-
-.listtask:hover {
-    background-color: #050505;
-}
-
-.listtask > * {
-    vertical-align: middle;
-}
-.listtask form > * {
-    vertical-align: middle;
-}
-
-.listtask .todopriority {
-    display:inline-block;
-    position: relative;
-    width: 50px;
-    height: 50px;
-    text-align: center;
-}
-.listtask .todopriority > span{
-    position: absolute;
-    font-size: 25px;
-    font-family: "PT Sans Narrow", sans-serif;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-}
-/*.listtask .todopriority > a{
-    display: inline;
-    height: 20px;
-    width: 25px;
-    font-size: 25px;
-    position: absolute;
-    text-decoration: none;
-    left: -5px;
-    visibility: hidden;
-}*/
-/*.listtask .todopriority .minus { top: 16px;}
-.listtask .todopriority .plus { top: 7px; font-size: 20px;}*/
-
-.listtask .todotitle {
-    display: inline-block;
-    height: 50px;
-    width: 250px;
-    text-align: left;
-    font-family: "Ubuntu Condensed", sans-serif;
-    font-size: 20px;
-}
-
-.listtask .todotitle > span {
-    display: inline-block;
-    position: relative;
-    top: 12px;
-}
-
-.listtask .buttons{
-    display: inline-block;
-    visibility: hidden;
-}
-
-.listtask .buttons > a, #addbtn {
-    display: inline-block;
-    background-image: url('/static/todobtns.png');
-    /*width: 23px;*/
-    height: 26px;
-}
-
-.complete { background-position: -54px 0px; width: 25px;}
-.complete:hover { background-position: -54px -26px; }
-.complete:active { background-position: -54px -51px; }
-
-.uncomplete { background-position: -78px 0px; width: 30px;}
-.uncomplete:hover { background-position: -78px -26px; }
-.uncomplete:active { background-position: -78px -51px; }
-
-.remove { background-position: -106px 0px; width: 23px;}
-.remove:hover { background-position: -106px -26px; }
-.remove:active { background-position: -106px -51px; }
-
-.edit { background-position: -164px 0px; width: 25px;}
-.edit:hover { background-position: -164px -26px; }
-.edit:active { background-position: -164px -51px; }
-
-#addbtn { background-position: -192px 0px; width: 25px;}
-#addbtn:hover { background-position: -192px -26px; }
-#addbtn:active { background-position: -192px -51px; }
-
-/*.expand { background-position: 0px 0px; width: 24px; height: 25px;}
-.expand:hover { background-position: 0px -34px; width: 24px; height: 17px;}
-.expand:active { background-position: 0px -59px; width: 24px; height: 17px;}*/
-
-
-.listtask .todopriority > a {
-    position: absolute;
-    display: inline-block;
-    background-image: url('/static/priobtns.png');
-    width: 17px;
-    height: 13px;
-    left: -10px;
-    visibility: hidden;
-}
-
-.listtask .todopriority .minus { background-position: -0px -0px; top: 26px; }
-.listtask .todopriority .minus:hover { background-position: -0px -18px; top: 26px; }
-.listtask .todopriority .minus:active { background-position: -0px -35px; top: 26px; }
-
-.listtask .todopriority .plus { background-position: -20px -0px; top: 13px; }
-.listtask .todopriority .plus:hover { background-position: -20px -18px; top: 13px; }
-.listtask .todopriority .plus:active { background-position: -20px -35px; top: 13px; }
-
-#listtask_container form {
-    display: block;
-}
-
-#listtask_container textarea {
-    background-color: #0b0b0b;
-    border: 1px solid #222222;
-    color: #79797a;
-    /*font-family: "Ubuntu Condensed", sans-serif;*/
-    /*font-size: 15px;*/
-}
-
-#listtask_container textarea {
-    resize: vertical;
-    overflow: hidden;
-    font-family: sans-serif;
-    font-size: 12px;
-    height: 200px;
-    width: 370px;
-    margin-bottom: 10px;
-    padding: 3px 3px 0px 5px;
-}
-
-#listtask_container input, #addform input {
-    border: 0;
-    border-left: 3px solid #333333;
-    background-color: #090909;
-    color: #79797a;
-    margin: 5px 10px 5px 0px;
-    font-family: "Ubuntu Condensed", sans-serif;
-    font-size: 20px;
-    padding-left:8px;
-    height: 20px;
-}
-
-#addbtn {
-    margin-left: 32px;
-    opacity: 0.4;
-}
-
-#addform input {
-    margin:0;
-    position: relative;
-    top: -5px;
-    left: 7px;
-    display: none;
-}
-
-#listtask_container .editpanel input[name="priority"] {
-    width: 40px;
-}
-#listtask_container .todotitle input[name="title"] {
-    /*width: 295px;*/
-    font-size: 20px;
-    position: relative;
-    padding:5px 5px 5px 5px;
-    border: 1px solid #222222;
-    top: 4px;
-    left: -6px;
-}
-#listtask_container .editpanel .save {
-    color: #464748;
-    display: inline-block;
-    font-family: "Ubuntu Condensed", sans-serif;
-    font-size: 20px;
-    position: relative;
-    left: 300px;
-    margin-bottom: 20px;
-    margin-top: 15px;
-}
-#listtask_container .editpanel .save:hover {
-    text-decoration: none;
-    color: #a7aaac;
-}
-#listtask_container .editpanel .save:active {
-    text-decoration: none;
-    color: #e9eaec;
-}
-
-#listtask_container .editpanel .priobar {
-    height: 8px;
-    width: 300px;
-}
-
-.listtask .exp {
-    margin-left: 47px;
-    display: none;
-    position: relative;
-}
-
-/*.listtask .exp .edit{
-    position: absolute;
-    left: -40px;
-}*/
-
-.listtask .exp .descpanel{
-    position: relative;
-    top: -12px;
-}
-
-.listtask .edit_show{
-    display: none;
-}
-
-
-.listtask .exp > * {
-    /*font-family: Calibri, Arial, sans-serif;*/
-    /*font-size: 13px;*/
-}
-
-
-
-#volumeContainer {
-    position: absolute;
-    top: 20px;
-    left: 15px;
-    /*margin-top:20px;*/
-    /*margin-left:15px;*/
-    cursor: pointer;
-}
-#volumeContainer > * {
-    vertical-align: middle;
-}
-
-#volumeControl {
-    display: inline-block;
-    /*position:relative;
-    top: 30px;
-    left: 30px;*/
-    width:100px;
-    height: 6px;
-}
-
-#volumeIcon {
-    background-image: url('/static/btns1.png');
-    display: inline-block;
-
-    width: 26px;
-    height: 23px;
-    margin: 0 3px 0 0;
-    opacity: 0.2;
-    cursor: default;
-    /*padding: 0 0 0 30px;*/
-    /*background-position: -132px -0px;*/
-}
-
-#volumeContainer .level3{ background-position: -132px -0px; }
-#volumeContainer .level2{ background-position: -132px -23px; }
-#volumeContainer .level1{ background-position: -132px -46px; }
-#volumeContainer .mute{ background-position: -160px -0px; }
-
-
-#daystrip {
-    position: absolute;
-    top: 20px;
-    left: 630px;
-}
-
-#daystrip > div {
-    position: relative;
-    display: inline-block;
-    width: 25px;
-    height: 25px;
-    background-color: #444444;
-    vertical-align: middle;
-    margin: 0 5px 5px 0;
-    border: 3px solid #777777;
-}
-/*#daystrip .cday > * {
-    vertical-align: middle;
-}
-*/
-#daystrip .MISSED {
-    background-color: #080808;
-    border: 3px solid #0a0a0a;
-    color: #111111;
-}
-
-#daystrip .COMPLETE {
-    background-color: #105010;
-    border: 3px solid #107010;
-    color: #209020;
-}
-
-#daystrip .REST {
-    background-color: #501049;
-    border: 3px solid #701054;
-    color: #902089;
-}
-
-
-#daystrip > div > span {
-    font-family: "Arial", sans-serif;
-    font-weight: bold;
-    font-size: 15px;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-55%, -55%);
-}
-
-#waterblock {
-    position: absolute;
-    top: 20px;
-    left: 570px;
-}
-
-#waterblock > .barcont{
-    height: 230px;
-    width: 10px;
-    border-radius: 9px;
-    background-color: #090909;
-    padding: 10px 10px 10px 10px;
-}
-
-
-#waterblock .buttons {
-    width: 50px;
-    position: relative;
-    left: -2px;
-    top: 20px;
-}
-
-#waterblock .buttons > a {
-    display: inline-block;
-    /*background-image: url('/static/todobtns.png');*/-
-    width: 50px;
-    /*height: 50px;*/
-    /*line-height: 100p-x;*/
-
-    font-family: "Ubuntu Condensed", sans-serif;
-    font-size: 15px;
-    color: #6d6e71;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-#waterblock .buttons > a:hover {
-        text-decoration: none;
-        color: #a7a9ac;
-}
-
-#waterblock .buttons > a:active {
-        text-decoration: none;
-        color: #e7e8e9;
-}
-
-/*#waterblock {*/-
 
 </style>
 {% endblock%}
@@ -1657,6 +1468,9 @@ $(function() {
 
 {% endfor %}
 </div>
+<div id="timeline">
+    <div class="bar"></div>
+</div>
 <div id="listtask_container">
     <form id="addform" action="/api/listtask/add" method="post">
         <a id="addbtn"></a>
@@ -1673,7 +1487,7 @@ $(function() {
                 <span>{{ listtask.priority }}</span>
             </div>
             <div class="todotitle">
-                <span class="edit_hide">{{ listtask.title }}</span>
+                <span class="edit_hide" {% if listtask.color %}style="color:#{{ listtask.color }};"{% endif %} >{{ listtask.title }}</span>
                 <input class="edit_show" type="text" name="title"></input>
             </div>
             <div class="buttons">
@@ -1692,7 +1506,10 @@ $(function() {
                         <div>
                             <input type="hidden" name="priority"></input>
                             <div class="priobar"></div>
-                            <div><a class="save">Save</a></div>
+                            <div>
+                                <input class="color" type="text" name="color"></input>
+                                <a class="save">Save</a>
+                            </div>
                         </div>
                     
                 </div>
@@ -1732,7 +1549,10 @@ $(function() {
                             <input type="hidden" name="priority"></input>
                             <div class="priobar"></div>
                             <!-- <input type="checkbox" name="use_markup"></input> -->
-                            <div><a class="save">Save</a></div>
+                            <div>
+                                <input class="color" type="text" name="color"></input>
+                                <a class="save">Save</a>
+                            </div>
                         </div>
                     
                 </div>
@@ -1751,15 +1571,23 @@ $(function() {
 
 
 <div id="waterblock">
+    <audio></audio>
     <div class="barcont" style="">
     </div>
     <div class="buttons">
          <a class="small">100ml</a>
-         <a class="big">500ml</a>
+         <a class="big">250ml</a>
          <a class="reset">Reset</a>
     </div>
 </div>
 
-<div></div>
+<canvas id="ActivityChart" width="300" height="300"></canvas>
+
+<div id="TimerContainer"></div>
+<!-- <div id="quote_cont"> -->
+    <!-- <blockquote>
+        Fear is the mind killer
+    </blockquote> -->
+<!-- </div> -->
 
 {% endblock %}

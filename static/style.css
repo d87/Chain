@@ -23,8 +23,628 @@ ul {
 a {
 	font-family: arial;
 	color: #AAAAAA;
+    text-decoration: none;
 }
 a:hover {
 	color: #FFFFFF;
     text-decoration: underline;
+}
+
+
+
+
+#ActivityChart {
+    position: absolute;
+    bottom: 30px;
+    left: 100px;
+}
+#quote_cont > blockquote:before { content: "«"; }
+#quote_cont > blockquote:after { content: "»"; }
+#quote_cont > blockquote {
+    font-family: "Georgia", serif;
+    font-style: italic;
+    /*margin: 10px -10px 10px -10px;*/
+    border: 0;
+    font-size: 40px;
+    color: #17120f;
+}
+
+#task_container{
+    position: relative;
+    top: 50px;
+}
+
+#startDayButton {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    position: absolute;
+    left: 200px;
+    top: -40px;
+    font-weight: 400;
+    font-size: 29px;
+    font-family: "Ubuntu Condensed", sans-serif;
+    color: #090909;
+}
+#task_container > a:hover {
+    text-decoration: none;
+    color: #272a2c;
+}
+#task_container > a:active {
+    text-decoration: none;
+    color: #696a6c;
+}
+
+.task > * {
+    display: inline-block;
+    /*font-width: normal;*/
+    /*font-family: "PT Sans Narrow", sans-serif;*/
+}
+
+.task .title {
+    font-weight: 400;
+    font-size: 25px;
+    font-family: "Ubuntu Condensed", sans-serif;
+}
+.task .duration {
+    float:right;
+    margin-left: 20px;
+    font-size: 15px;
+    font-family: "PT Sans Narrow", sans-serif;
+}
+
+.task .warning {
+    position:relative;
+    left: -80px;
+    top: 20px;
+    width: 130px;
+    height: 130px;
+    background-image: url('/static/warning.png');
+}
+
+.task .clock {
+    position:relative;
+    left: 50px;
+    top: 20px;
+    width: 130px;
+    height: 130px;
+}
+
+.task .clock span{
+    position: absolute;
+    /*This works because position: absolute means something
+    like "use top, right, bottom, left to position yourself in relation to the nearest ancestor
+    who has position: absolute or position: relative*/
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 30px;
+    font-width: 100;
+    font-family: "PT Sans Narrow", sans-serif;
+    /*transform: translate(-50%, -50%);*/
+}
+
+.task .progressbar {
+    /*display: inline-block;*/
+    width: 300px;
+    height: 20px;
+    padding: 10px 10px 10px 10px;
+    background-color: #090909;
+    margin: 10px 0 10px 0;
+}
+
+.task .pbcont {
+    vertical-align: top;
+    padding: 10px 10px 10px 10px;
+    margin: 10px 0 0 0;
+}
+
+.task .pbcont a {
+    background-image: url('/static/btns1.png');
+    display: inline-block;
+
+    font-family: "PT Sans Narrow", sans-serif;
+    font-size: 15px;
+    color: #79797a;
+
+    width: 24px;
+    height: 23px;
+    margin: 0 50px 0 0;
+    vertical-align: bottom;
+    cursor: pointer;
+}
+.task .pbcont a:hover {
+    color: #a7a9ac;
+    text-decoration: none;
+}
+.task .pbcont a:active {
+    color: #e7e8e9;
+    text-decoration: none;
+}
+.task .pbcont a span {
+    padding: 0 0 0 30px;
+    position: relative;
+    top: 5px;
+    vertical-align: bottom;
+}
+
+.pomo { background-position: -78px 0px; }
+.pomo:hover { background-position: -78px -23px; }
+.pomo:active { background-position: -78px -46px; }
+
+.start { background-position: -27px 0px; }
+.start:hover { background-position: -27px -23px; }
+.start:active { background-position: -27px -46px; }
+
+.stop { background-position: -104px 0px; }
+.stop:hover { background-position: -104px -23px; }
+.stop:active { background-position: -104px -46px; }
+
+.reset { background-position: -1px 0px; }
+.reset:hover { background-position: -1px -23px; }
+.reset:active { background-position: -1px -46px; }
+
+
+#listtask_container {
+    position: absolute;
+    left: 600px;
+    top: 70px;
+}
+
+.listtask {
+    font-family: "Arial", sans-serif;
+    padding-left: 17px;
+    /*height: 20px;*/
+    width: 450px;
+}
+
+.listtask:hover {
+    background-color: #050505;
+}
+
+.listtask > * {
+    vertical-align: middle;
+}
+.listtask form > * {
+    vertical-align: middle;
+}
+
+.listtask .todopriority {
+    display:inline-block;
+    position: relative;
+    width: 50px;
+    height: 50px;
+    text-align: center;
+}
+.listtask .todopriority > span{
+    position: absolute;
+    font-size: 25px;
+    font-family: "PT Sans Narrow", sans-serif;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+/*.listtask .todopriority > a{
+    display: inline;
+    height: 20px;
+    width: 25px;
+    font-size: 25px;
+    position: absolute;
+    text-decoration: none;
+    left: -5px;
+    visibility: hidden;
+}*/
+/*.listtask .todopriority .minus { top: 16px;}
+.listtask .todopriority .plus { top: 7px; font-size: 20px;}*/
+
+.listtask .todotitle {
+    display: inline-block;
+    height: 50px;
+    width: 250px;
+    text-align: left;
+    font-family: "Ubuntu Condensed", sans-serif;
+    font-size: 20px;
+}
+
+.listtask .todotitle > span {
+    display: inline-block;
+    position: relative;
+    top: 12px;
+}
+
+.listtask .buttons{
+    display: inline-block;
+    visibility: hidden;
+}
+
+.listtask .buttons > a, #addbtn {
+    display: inline-block;
+    background-image: url('/static/todobtns.png');
+    /*width: 23px;*/
+    height: 26px;
+}
+
+.complete { background-position: -54px 0px; width: 25px;}
+.complete:hover { background-position: -54px -26px; }
+.complete:active { background-position: -54px -51px; }
+
+.uncomplete { background-position: -78px 0px; width: 30px;}
+.uncomplete:hover { background-position: -78px -26px; }
+.uncomplete:active { background-position: -78px -51px; }
+
+.remove { background-position: -106px 0px; width: 23px;}
+.remove:hover { background-position: -106px -26px; }
+.remove:active { background-position: -106px -51px; }
+
+.edit { background-position: -164px 0px; width: 25px;}
+.edit:hover { background-position: -164px -26px; }
+.edit:active { background-position: -164px -51px; }
+
+#addbtn { background-position: -192px 0px; width: 25px;}
+#addbtn:hover { background-position: -192px -26px; }
+#addbtn:active { background-position: -192px -51px; }
+
+/*.expand { background-position: 0px 0px; width: 24px; height: 25px;}
+.expand:hover { background-position: 0px -34px; width: 24px; height: 17px;}
+.expand:active { background-position: 0px -59px; width: 24px; height: 17px;}*/
+
+
+.listtask .todopriority > a {
+    position: absolute;
+    display: inline-block;
+    background-image: url('/static/priobtns.png');
+    width: 17px;
+    height: 13px;
+    left: -10px;
+    visibility: hidden;
+}
+
+.listtask .todopriority .minus { background-position: -0px -0px; top: 26px; }
+.listtask .todopriority .minus:hover { background-position: -0px -18px; top: 26px; }
+.listtask .todopriority .minus:active { background-position: -0px -35px; top: 26px; }
+
+.listtask .todopriority .plus { background-position: -20px -0px; top: 13px; }
+.listtask .todopriority .plus:hover { background-position: -20px -18px; top: 13px; }
+.listtask .todopriority .plus:active { background-position: -20px -35px; top: 13px; }
+
+#listtask_container form {
+    display: block;
+}
+
+#listtask_container textarea {
+    background-color: #0b0b0b;
+    border: 1px solid #222222;
+    color: #79797a;
+    /*font-family: monospace;*/
+    /*font-size: 15px;*/
+    /*font-family: "Ubuntu Condensed", sans-serif;*/
+    /*font-size: 15px;*/
+}
+
+#listtask_container textarea {
+    resize: vertical;
+    overflow: hidden;
+    /*font-family: sans-serif;*/
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 13px;
+    height: 200px;
+    width: 370px;
+    margin-bottom: 10px;
+    padding: 3px 3px 0px 5px;
+}
+
+#listtask_container input, #addform input {
+    border: 0;
+    border-left: 3px solid #333333;
+    background-color: #090909;
+    color: #79797a;
+    margin: 5px 10px 5px 0px;
+    font-family: "Ubuntu Condensed", sans-serif;
+    font-size: 20px;
+    padding-left:8px;
+    height: 20px;
+}
+
+#addbtn {
+    margin-left: 32px;
+    opacity: 0.4;
+}
+
+#addform input {
+    margin:0;
+    position: relative;
+    top: -5px;
+    left: 7px;
+    display: none;
+}
+
+#listtask_container .editpanel input[name="priority"] {
+    width: 40px;
+}
+#listtask_container .todotitle input[name="title"] {
+    /*width: 295px;*/
+    font-size: 20px;
+    position: relative;
+    padding:5px 5px 5px 5px;
+    border: 1px solid #222222;
+    top: 4px;
+    left: -6px;
+}
+#listtask_container .editpanel .save {
+    color: #464748;
+    display: inline-block;
+    font-family: "Ubuntu Condensed", sans-serif;
+    font-size: 20px;
+    position: relative;
+    left: 300px;
+    margin-bottom: 20px;
+    margin-top: 15px;
+}
+#listtask_container .editpanel .save:hover {
+    text-decoration: none;
+    color: #a7aaac;
+}
+#listtask_container .editpanel .save:active {
+    text-decoration: none;
+    color: #e9eaec;
+}
+
+#listtask_container .editpanel .priobar {
+    height: 8px;
+    width: 300px;
+}
+
+.listtask .exp {
+    margin-left: 47px;
+    display: none;
+    position: relative;
+}
+
+/*.listtask .exp .edit{
+    position: absolute;
+    left: -40px;
+}*/
+
+.listtask .exp .descpanel{
+    position: relative;
+    top: -12px;
+}
+
+.listtask .edit_show{
+    display: none;
+}
+
+
+.listtask .exp > * {
+    /*font-family: Calibri, Arial, sans-serif;*/
+    /*font-size: 13px;*/
+}
+
+
+
+#volumeContainer {
+    position: absolute;
+    top: 20px;
+    left: 15px;
+    /*margin-top:20px;*/
+    /*margin-left:15px;*/
+    cursor: pointer;
+}
+#volumeContainer > * {
+    vertical-align: middle;
+}
+
+#volumeControl {
+    display: inline-block;
+    /*position:relative;
+    top: 30px;
+    left: 30px;*/
+    width:100px;
+    height: 6px;
+}
+
+#volumeIcon {
+    background-image: url('/static/btns1.png');
+    display: inline-block;
+
+    width: 26px;
+    height: 23px;
+    margin: 0 3px 0 0;
+    opacity: 0.2;
+    cursor: default;
+    /*padding: 0 0 0 30px;*/
+    /*background-position: -132px -0px;*/
+}
+
+#volumeContainer .level3{ background-position: -132px -0px; }
+#volumeContainer .level2{ background-position: -132px -23px; }
+#volumeContainer .level1{ background-position: -132px -46px; }
+#volumeContainer .mute{ background-position: -160px -0px; }
+
+
+#daystrip {
+    position: absolute;
+    top: 20px;
+    left: 630px;
+}
+
+#daystrip > div {
+    position: relative;
+    display: inline-block;
+    width: 25px;
+    height: 25px;
+    background-color: #444444;
+    vertical-align: middle;
+    margin: 0 5px 5px 0;
+    border: 3px solid #777777;
+}
+/*#daystrip .cday > * {
+    vertical-align: middle;
+}
+*/
+#daystrip .MISSED {
+    background-color: #080808;
+    border: 3px solid #0a0a0a;
+    color: #111111;
+}
+
+#daystrip .COMPLETE {
+    background-color: #105010;
+    border: 3px solid #107010;
+    color: #209020;
+}
+
+#daystrip .REST {
+    background-color: #501049;
+    border: 3px solid #701054;
+    color: #902089;
+}
+
+
+#daystrip > div > span {
+    font-family: "Arial", sans-serif;
+    font-weight: bold;
+    font-size: 15px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-55%, -55%);
+}
+
+#timeline {
+    position: absolute;
+    top: 70px;
+    left: 355px;
+}
+
+#timeline > .bar {
+    height: 430px;
+    width: 4px;
+    border-radius: 3px;
+    background-color: #090909;
+    padding: 3px 3px 3px 3px;
+}
+
+#waterblock {
+    position: absolute;
+    top: 20px;
+    left: 560px;
+}
+
+#waterblock > .barcont{
+    height: 230px;
+    width: 10px;
+    border-radius: 9px;
+    background-color: #090909;
+    padding: 10px 10px 10px 10px;
+}
+
+
+#waterblock .buttons {
+    width: 50px;
+    position: relative;
+    left: -2px;
+    top: 20px;
+}
+
+#waterblock .buttons > a {
+    display: inline-block;
+    /*background-image: url('/static/todobtns.png');*/-
+    width: 50px;
+    /*height: 50px;*/
+    /*line-height: 100p-x;*/
+
+    font-family: "Ubuntu Condensed", sans-serif;
+    font-size: 15px;
+    color: #6d6e71;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+#waterblock .buttons > a:hover {
+        text-decoration: none;
+        color: #a7a9ac;
+}
+
+#waterblock .buttons > a:active {
+        text-decoration: none;
+        color: #e7e8e9;
+}
+
+#TimerContainer {
+    position: absolute;
+    top: 30px;
+    right: 100px;
+}
+
+#TimerContainer .usertimer {
+    font-size: 30px;
+}
+
+#TimerContainer .expired  {
+    color: #FF0000;
+}
+
+#TimerContainer .buttons  {
+    display: inline-block;
+
+}
+
+/*#waterblock {*/
+
+
+@media only screen and (max-width: 500px) {
+    /*#startDayButton { position: relative; left: 0; top: 0; }*/
+    #task_container {display: none;}
+    #waterblock {display: none;}
+    #daystrip {display: none;}
+    #timeline {
+        display: none;
+        position: absolute;
+        top: 70px;
+        left: 355px;
+    }
+
+    #volumeContainer {
+        position: absolute;
+        top: 20px;
+        left: auto;
+        right: 15px;
+    }
+
+    #ActivityChart {
+        position: static;
+        left:auto;
+        top:auto;
+        bottom: auto;
+    }
+
+    #listtask_container {
+        /*background-color: #ff0000;*/
+        position: static;
+        left: 0px;
+        top: 0px;
+    }
+
+    .listtask {
+        width: auto;
+        max-width: 450px;
+    }
+    .listtask .todotitle {
+        width: auto;
+        /*font-family: "Ubuntu Condensed", sans-serif;*/
+        /*font-size: 20px;*/
+    }
+    .listtask .buttons {
+        display: none;
+        /*float: right;*/
+    }
+
 }

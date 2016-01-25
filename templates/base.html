@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="ru" xml:lang="ru">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/> 
-    <meta name="viewport" content="width=device-width"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Jar{% endblock %}</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}" />
 
@@ -10,8 +10,11 @@
     <link href='http://fonts.googleapis.com/css?family=Roboto+Condensed&subset=latin,cyrillic' rel='stylesheet' type='text/css'>
     <link href='http://fonts.googleapis.com/css?family=Ubuntu+Condensed&subset=cyrillic-ext,latin' rel='stylesheet' type='text/css'>
     <script type="text/javascript" src="/static/jquery.min.js"></script>
+    <script type="text/javascript" src="/static/Chart.js"></script>
     <script type="text/javascript" src="/static/minidaemon.js"></script>
     <script type="text/javascript" src="/static/progressbar.js"></script>
+    <script type="text/javascript" src="/static/spectrum.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/spectrum.css" />
     <link rel="shortcut icon" href="/static/favicon.gif" />
     {% block head %}{% endblock %}
 </head>
