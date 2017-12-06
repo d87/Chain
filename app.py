@@ -5,10 +5,12 @@ from flask import jsonify
 from flask import request
 from flask import Response
 # from database import db.session
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime, timedelta, time
-from flask.ext.admin import Admin, BaseView, expose #flask-admin
-from flask.ext.admin.contrib.sqla import ModelView
+from flask_admin import Admin, BaseView, expose #flask-admin
+from flask_admin.contrib.sqla import ModelView
+
+import json
 
 
 # deps so far:
@@ -18,9 +20,14 @@ from flask.ext.admin.contrib.sqla import ModelView
 # wtforms
 # flask-wtf
 
+
+
 app = Flask(__name__)
 
+assets = json.load(open(app.root_path+"/build/asset-manifest.json"))
+
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://django@localhost/whiplash"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:////tmp/test.db"
 app.config['SECRET_KEY'] = 'change-that'
 app.config['CSRF_ENABLED'] = True
@@ -85,9 +92,9 @@ class ListTask(db.Model):
     state = db.Column(db.Unicode(10), default = u"ACTIVE")
     color = db.Column(db.Unicode(8), default = u"")
 
-    created_date = db.Column(db.DateTime, default=datetime.now())
+    created_date = db.Column(db.DateTime, default=datetime.utcnow())
     is_time_limited = db.Column(db.Boolean, default = False)
-    expiration_date = db.Column(db.DateTime, default=datetime.now())
+    expiration_date = db.Column(db.DateTime, default=datetime.utcnow())
 
     use_markup = db.Column(db.Boolean, default = False)
 
@@ -106,6 +113,7 @@ class ListTask(db.Model):
             "id" : self.id,
             "title" : self.title,
             "description" : self.description_markdown,
+            "description_raw" : self.description,
             "priority" : self.priority,
             "state" : self.state,
             "color" : self.color,
@@ -116,6 +124,29 @@ class ListTask(db.Model):
         if not markup:
             obj["description_body"] = self.description
         return obj
+
+
+class JournalEntry(db.Model):
+    __tablename__ = 'journal'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.Unicode(100))
+    text = db.Column(db.UnicodeText, default=u"")
+    rating = db.Column(db.Integer, default=5)
+
+    created_date = db.Column(db.DateTime, default=datetime.utcnow())
+    edited_date = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return '<JournalEntry %r>' % (self.text[:10])
+
+    def as_dict(self):
+        return {
+            "id" : self.id,
+            "text" : self.text,
+            "rating" : self.rating,
+            "created_date" : self.created_date.isoformat(),
+            "edited_date" : self.created_date.isoformat(),
+        }
 
 
 
@@ -132,6 +163,7 @@ class Task(db.Model):
     pomo_break_length = db.Column(db.Integer, default=5*60)
     pomo_completed = db.Column(db.Integer, default=0)
     pomo_state = db.Column(db.Unicode(12), default=u"INACTIVE")
+    color = db.Column(db.Unicode(7), default=u"#33bb33")
     # excuses = relationship("Excuse", back_populates="task")
     # mask = x < daynum
     # repeat & mask
@@ -147,7 +179,8 @@ class Task(db.Model):
             "pomo_state": self.pomo_state,
             "pomo_time": self.pomo_time,
             "pomo_length": self.pomo_length,
-            "pomo_break_length": self.pomo_break_length
+            "pomo_break_length": self.pomo_break_length,
+            "color": self.color
         }
         return resp
         # if cmd:
@@ -198,6 +231,7 @@ admin.add_view(ModelView(UserData, db.session))
 admin.add_view(ModelView(Task, db.session))
 admin.add_view(ModelView(ListTask, db.session))
 admin.add_view(ModelView(Day, db.session))
+admin.add_view(ModelView(JournalEntry, db.session))
 
 
 #------------------------
@@ -262,10 +296,12 @@ def tasks():
     # ud = UserData.query.get(1)
     # if not ud:
     #     ud = UserData()
-    #     ud.day_start_date = datetime.now()
+    #     ud.day_start_date = datetime.utcnow()
     #     db.session.add(ud)
     #     db.session.commit()
-    return render_template("home.html",
+    return render_template("home_react.html",
+                    bundle_js=assets["main.js"],
+                    bundle_css=assets["main.css"],
                     tasks=tasks,
                     listtasks=listtasks,
                     days=dayrange(d1, d2, query=days_query),
@@ -308,7 +344,7 @@ def day_start():
             ud = UserData.query.all()[0]
         except IndexError:
             ud = UserData()
-            ud.day_start_date = datetime.now()
+            ud.day_start_date = datetime.utcnow()
             db.session.add(ud)
             db.session.commit()
         return json_response("ok", ud.as_dict(), 200)
@@ -327,7 +363,7 @@ def water_level():
             ud = UserData.query.all()[0]
         except IndexError:
             ud = UserData()
-            ud.day_start_date = datetime.now()
+            ud.day_start_date = datetime.utcnow()
             db.session.add(ud)
             db.session.commit()
         return json_response("ok", ud.as_dict(), 200)
@@ -343,6 +379,14 @@ def listtask_add():
         db.session.commit()
 
         return json_response("ok", lt.as_dict(), 201)
+
+@app.route('/api/listtask/list', methods=['GET'])
+def listtask_list():
+    if request.method == 'GET':
+        ltasks = ListTask.query.all()
+        ltasks_dict = [ x.as_dict() for x in reversed(ltasks) ]
+
+        return json_response("ok", ltasks_dict, 201)
 
 
 @app.route('/api/listtask/<int:ltid>', methods=['GET', 'POST'])
@@ -381,14 +425,10 @@ def listtask_edit(ltid):
     if request.method == 'POST':
         lt = ListTask.query.get(ltid)
 
-        print(request.form)
-
         if request.form["priority"]:
             new_priority = int(request.form["priority"])
-            if new_priority > 100:
-                new_priority = 100
-            if new_priority < 0:
-                new_priority = 0
+            new_priority = min(new_priority, 100)
+            new_priority = max(new_priority, 0)
             lt.priority = new_priority
 
         if request.form["descbody"]:
@@ -397,8 +437,9 @@ def listtask_edit(ltid):
         if request.form["title"]:
             lt.title = request.form["title"]
 
-        lt.color = request.form["color"] or ""
-        
+        if request.form["color"]:
+            lt.color = request.form["color"] or ""
+
         db.session.commit()
 
         return json_response("ok", lt.as_dict(markup=True), 200)
@@ -526,7 +567,107 @@ def events():
     return "{ status: 'OK' }", 200
 
 
+@app.route('/api/journal/list', methods=['GET'])
+def journal_entry_list():
+    if request.method == 'GET':
+        posts = JournalEntry.query.all()
+        posts_dict = [ x.as_dict() for x in reversed(posts) ]
 
+        return json_response("ok", posts_dict, 201)
+
+@app.route('/api/journal/add', methods=['GET', 'POST'])
+def journal_entry_add():
+    if request.method == 'POST':
+        post = JournalEntry()
+        text = request.form['text']
+        if text:
+            post.text = text
+            db.session.add(post)
+            db.session.commit()
+
+            return json_response("ok", post.as_dict(), 201)
+
+
+@app.route('/api/journal/<int:postID>/update', methods=['POST'])
+def journal_entry_update(postID):
+    if request.method == 'POST':
+        post = JournalEntry.query.filter(JournalEntry.id == postID).first()
+        text = request.form['text']
+        if post and text:
+            post.text = text
+            db.session.commit()
+            
+            return "{ status: 'OK' }", 200
+
+
+@app.route('/api/journal/<int:postID>/delete', methods=['GET', 'POST'])
+def journal_entry_delete(postID):
+    if request.method == 'POST':
+        post = JournalEntry.query.filter(JournalEntry.id == postID).first()
+        if post:
+            db.session.delete(post)
+            db.session.commit()
+
+            return json_response("ok", None, 200)
+
+
+
+@app.route('/journal', methods=['GET', 'POST'])
+def journal():
+    return render_template("journal.html")
+
+
+
+
+@app.route('/api/tasks/list', methods=['GET'])
+def tasks_api_list():
+    if request.method == 'GET':
+        tasks = Task.query.all()
+        tasks_dict = [ x.as_dict() for x in reversed(tasks) ]
+
+        return json_response("ok", tasks_dict, 201)
+
+@app.route('/api/task/<int:task_id>/sync', methods=['POST'])
+def tasks_api_sync(task_id):
+    if request.method == 'POST':
+        new_time = int(request.form['new_time'])
+
+        task = Task.query.filter(Task.id == task_id).first()
+
+        task.task_time = new_time
+        if task.task_time >= task.task_length:
+            task.task_time = task.task_length
+            task.task_state = "COMPLETED"
+
+        db.session.commit()
+        return json_response("ok", task.as_dict())
+
+@app.route('/api/task/<int:task_id>/pomo_complete', methods=['POST'])
+def tasks_api_pomo_complete(task_id):
+    if request.method == 'POST':
+        task = Task.query.filter(Task.id == task_id).first()
+        task.task_time = task.task_time + task.pomo_length
+        if task.task_time >= task.task_length:
+            task.task_time = task.task_length
+            task.task_state = "COMPLETED"
+
+        db.session.commit()
+        return json_response("ok", task.as_dict())
+
+@app.route('/api/task/<int:task_id>/reset', methods=['POST'])
+def tasks_api_reset(task_id):
+    if request.method == 'POST':
+        task = Task.query.filter(Task.id == task_id).first()
+        task.reset()
+        db.session.commit()
+        return json_response("ok", task.as_dict())
+
+@app.route('/api/tasks/rainmeter', methods=['GET'])
+def tasks_rainmeter():
+    if request.method == 'GET':
+        tasks = Task.query.all()
+
+        return render_template("rainmeter.html", tasks=tasks )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
