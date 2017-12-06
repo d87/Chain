@@ -189,7 +189,7 @@ class Pomodoro extends Component {
         this.pomoDuration = pomoDuration
         this.pomoStatus = pomoStatus
 
-        const color = (pomoStatus == "ACTIVE") ? colors.ACTIVE[0] : colors.BREAK[0]
+        const color = (pomoStatus === "ACTIVE") ? colors.ACTIVE[0] : colors.BREAK[0]
 
         if (pomoStatus === "ACTIVE" || pomoStatus === "BREAK"){
             this.pomoTimer.resume()
@@ -312,9 +312,8 @@ class Task extends Component {
 // Connecting
 
 const mapStateToProps = (state, props) => {
-    console.log("map stae to props", state)
     return {
-        state123: state
+        // state: state
     }
 }
 

@@ -24,7 +24,7 @@ const todoEdit = (id) => {
 
 const todoSaveClient = (id, newData) => {
     return {
-        type: "SAVE",
+        type: "TODO_SAVE",
         id: id,
         newData: newData
     }
@@ -32,7 +32,7 @@ const todoSaveClient = (id, newData) => {
 
 const todoSaveError = (id) => {
     return {
-        type: "SAVE_ERROR",
+        type: "TODO_SAVE_ERROR",
         id: id,
     }
 }
@@ -114,20 +114,24 @@ const todoDelete = (id) => {
 function getXY(obj) {
     if (!obj) return [0,0];
 
-    var left = 0, top = 0, pos, lastLeft;
+    let left = 0
+    let top = 0
+    let pos//, lastLeft;
     if (obj.offsetParent) {
         do {
-            left += (lastLeft = obj.offsetLeft);
+            //left += (lastLeft = obj.offsetLeft);
+            left += obj.offsetLeft
             top += obj.offsetTop;
             pos = obj.style.position
-            if (pos == 'fixed' || pos == 'absolute' || (pos == 'relative')) {
+            if (pos === 'fixed' || pos === 'absolute' || (pos === 'relative')) {
                 left -= obj.scrollLeft;
                 top -= obj.scrollTop;
 
             }
-        } while (obj = obj.offsetParent);
+            obj = obj.offsetParent
+        } while (obj)
     }
-    return [left,top];
+    return [left,top]
 }
 
 
@@ -166,7 +170,7 @@ class ProgressBar extends Component {
         const orientation = this.props.orientation
         const attachPoint = this.props.attachPoint
 
-        if (orientation == "vertical" && attachPoint == "top"){
+        if (orientation === "vertical" && attachPoint === "top"){
             this.barStyleBase["bottom"] = ""
             this.barStyleBase["top"] = "0px"
             this.barStyleBase["left"] = "0px"
@@ -310,8 +314,8 @@ class Todo extends Component {
             <div data-created="" className="listtask" onMouseEnter={this.handleMouseEnter} onMouseLeave={this.handleMouseLeave}>
                 <form onSubmit={this.handleSubmit}>
                 <div className="todopriority">
-                    { this.state.isHovering && <a className="minus"></a> }
-                    { this.state.isHovering && <a className="plus"></a> }
+                    { this.state.isHovering && <div className="minus"></div> }
+                    { this.state.isHovering && <div className="plus"></div> }
                     <span style={{ color: priorityColor }}>{ priority }</span>
                 </div>
                 { this.props.state === "ACTIVE" ? (
@@ -328,10 +332,10 @@ class Todo extends Component {
                 </div>
                 { (this.state.isHovering || isEditing) &&
                     <div className="buttons">
-                        <a className="edit" onClick={onEditClick}></a>
-                        <a className="complete"></a>
-                        <a className="uncomplete"></a>
-                        <a className="remove" onClick={onDelete}></a>
+                        <div className="edit" onClick={onEditClick}></div>
+                        <div className="complete"></div>
+                        <div className="uncomplete"></div>
+                        <div className="remove" onClick={onDelete}></div>
                     </div>
                 }
                 { isExpanded &&

@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { componentToHex, rgbToHex, mulColor, formatTime2, formatTime, MiniDaemon } from './common'
+import { mulColor, formatTime2, MiniDaemon } from './common'
 
 const rowHeight = 23
 
@@ -285,7 +285,7 @@ const Schedule = ({ tasks }) => {
             <div style={ blockStyle }>
                 
                 {lines.map(index =>
-                    <ScheduleRow key={index} index={ index } timestring={!(index % 1) && formatTime2(dayStart+((index+1)*1800)) || null}/>
+                    <ScheduleRow key={index} index={ index } timestring={ (!(index % 1)) ? formatTime2(dayStart+((index+1)*1800)) : null}/>
                 )}
 
                 <Timeline progress={40} />

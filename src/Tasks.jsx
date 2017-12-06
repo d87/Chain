@@ -4,7 +4,7 @@ import Task from './Task'
 
 // Reducer
 
-const taskReducer = (state = {}, action) => {
+const taskReducer = (state = [], action) => {
     switch (action.type) {
         case 'INIT': {
             return action.newState

@@ -11,7 +11,7 @@ const postAdd = () => {
 
 // Reducer
 
-const postReducer = (state = {}, action) => {
+const postReducer = (state = [], action) => {
     switch (action.type) {
         case 'INIT': {
             return action.newState

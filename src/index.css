@@ -293,7 +293,7 @@ a:hover {
     display: inline-block;
 }
 
-.listtask .buttons > a, #addbtn {
+.listtask .buttons > div, #addbtn {
     display: inline-block;
     background-image: url('/static/todobtns.png');
     /*width: 23px;*/

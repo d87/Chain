@@ -6,7 +6,7 @@ import EditableTodo from './Todo';
 
 const todoAdd = (title) => {
     return {
-        type: "ADD",
+        type: "TODO_ADD",
         title: title
     }
 }
@@ -14,7 +14,7 @@ const todoAdd = (title) => {
 
 // Reducer
 
-const todoReducer = (state = {}, action) => {
+const todoReducer = (state = [], action) => {
     switch (action.type) {
         case 'TODO_INIT': {
             return action.newState
@@ -34,7 +34,7 @@ const todoReducer = (state = {}, action) => {
                 else return todo
                 })
         }
-        case 'ADD':  {
+        case 'TODO_ADD':  {
             for (const post of state) {
                 if (post.id === null)
                     return state;
@@ -66,7 +66,7 @@ const todoReducer = (state = {}, action) => {
         //         })
         // }
         
-        case 'SAVE': {
+        case 'TODO_SAVE': {
             return state.map(todo => {
                 if (todo.id === action.id)
                     return Object.assign({}, todo, {
@@ -78,7 +78,7 @@ const todoReducer = (state = {}, action) => {
                 else return todo
                 })
         }
-        case 'DELETE': {
+        case 'TODO_DELETE': {
             return state.filter(todo => {
                     return todo.id !== action.id;
                 })
@@ -120,7 +120,8 @@ class TodoList extends Component {
 
     handleAddSubmit(event) {
         event.preventDefault();
-        return this.props.onAddClick(this.state.title)
+        if (this.state.title !== "")
+            return this.props.onAddClick(this.state.title)
     }
 
     handleAddTitleChange(title) {
@@ -138,7 +139,6 @@ class TodoList extends Component {
                     for (const todo of todos) {
                         todo.created_date = new Date(todo.created_date)
                     }
-                    console.log("TODOS", todos)
                     // let jstasks = []
 
                     // for (const task of tasks) {
@@ -176,12 +176,12 @@ class TodoList extends Component {
     }
 
     render() {
-        const { todos, onAddClick } = this.props
+        const { todos } = this.props
 
         return (
             <div id="listtask_container">
                 <form id="addform" action="" method="post">
-                    <a id="addbtn" onClick={this.handleAddSubmit}></a>
+                    <div id="addbtn" onClick={this.handleAddSubmit}></div>
                     <input type="text" name="title" tabIndex="-1" onChange={this.handleAddTitleChange} value={this.state.title}></input>
                 </form>
                 {todos.map(todo =>

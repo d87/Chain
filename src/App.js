@@ -18,12 +18,15 @@ import { todoReducer } from './TodoList'
 import Schedule from './Calendar'
 import { scheduleReducer } from './Calendar'
 
+import SoundPlayer from './SoundPlayer'
+import { soundReducer } from './SoundPlayer'
 
 
 const reducers = combineReducers({
     posts: postReducer,
     tasks: taskReducer,
-    todos: todoReducer
+    todos: todoReducer,
+    sound: soundReducer
 })
 
 const actionLogger = ({dispatch, getState}) =>
@@ -33,32 +36,10 @@ const middleware = applyMiddleware(actionLogger, thunk)
 const store = createStore(
     reducers,
     {
-        posts: [
-            // {
-            //     id: 1,
-            //     text: "After shattering the Worldstone, the young Amazon Cassia had changed. She had seen hatred, terror, and destruction firsthand. If the Askari were to survive the coming darkness, they needed an army. She would begin their training immediately.",
-            //     isEditing: false,
-            //     created_date: Date.now()
-            // },
-
-            // {
-            //     id: 2,
-            //     text: "Since his activation, Probius has always wanted to prove himself. He may be small, but he made a big difference by warping in a critical pylon during the retaking of Aiur. As the bravest of probes, Probius is eager to fulfill his purpose in the Nexus.",
-            //     isEditing: false,
-            //     created_date: Date.now()-2
-            // },
-
-            // {
-            //     id: 3,
-            //     text: "From the streets of Rio to the clubs on King's Row, Lúcio's beats bring the party to life, and drive the people to action. Now he's on tour in the Nexus, ready to break it down, and to continue fighting for what's right.",
-            //     isEditing: false,
-            //     created_date: Date.now()-4
-            // }
-        ],
-        tasks: [
-        ],
-        todos: [
-        ]
+        // posts: [],
+        // tasks: [],
+        // todos: [],
+        // sound: {}
     },
     middleware
 )
@@ -115,8 +96,8 @@ class JournalApp extends Component {
         return (
             <div className="container App">
                 <div className="jumbotron">
-                    <h1>My Damn Journal</h1>
-                    <p>so here goes...</p>
+                    <h1>Journal</h1>
+                    <p>for things</p>
                 </div>
                     <Journal/>
             </div>
@@ -126,11 +107,11 @@ class JournalApp extends Component {
 
 // export default JournalApp;
 
-
 class TasksApp extends Component {
     render() {
         return (
             <div className="container App">
+                <SoundPlayer/>
                 <Schedule/>
                 <Tasks/>
                 <TodoList/>
@@ -140,7 +121,6 @@ class TasksApp extends Component {
 }
 
 const render = () => {
-    console.log('rednering')
     // <JournalApp />
     ReactDOM.render(
         <Provider store={store}>
