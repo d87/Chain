@@ -201,12 +201,6 @@ a:hover {
 .reset:active { background-position: -1px -46px; }
 
 
-#listtask_container {
-    position: absolute;
-    left: 900px;
-    top: 70px;
-}
-
 .listtask {
     font-family: "Arial", sans-serif;
     padding-left: 17px;

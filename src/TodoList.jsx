@@ -43,7 +43,9 @@ const todoReducer = (state = [], action) => {
                 {
                     id: null,
                     isEditing: true,
+                    isExpanded: true,
                     title: action.title,
+                    priority: 100,
                     description_raw: "",
                     color: "",
                     state: "ACTIVE",
@@ -68,13 +70,15 @@ const todoReducer = (state = [], action) => {
         
         case 'TODO_SAVE': {
             return state.map(todo => {
-                if (todo.id === action.id)
+                if (todo.id === action.id){
                     return Object.assign({}, todo, {
+                        id: action.serverData.id,
                         isEditing: false,
-                        description_raw: action.newData.body,
-                        priority: action.newData.priority,
-                        color: action.newData.color
+                        description_raw: action.serverData.description_raw,
+                        priority: action.serverData.priority,
+                        color: action.serverData.color
                     });
+                }
                 else return todo
                 })
         }
@@ -116,16 +120,20 @@ class TodoList extends Component {
         this.state = {
             title: ""
         }
+
+        this.handleAddTitleChange = this.handleAddTitleChange.bind(this);
+        this.handleAddSubmit = this.handleAddSubmit.bind(this);
     }
 
     handleAddSubmit(event) {
         event.preventDefault();
-        if (this.state.title !== "")
+        // if (this.state.title !== "")
+        console.log("add submit")
             return this.props.onAddClick(this.state.title)
     }
 
-    handleAddTitleChange(title) {
-        this.setState({ title: title })
+    handleAddTitleChange(event) {
+        this.setState({ title: event.target.value })
     }
 
 
@@ -179,8 +187,8 @@ class TodoList extends Component {
         const { todos } = this.props
 
         return (
-            <div id="listtask_container">
-                <form id="addform" action="" method="post">
+            <div className="col-xs-12 col-sm-4" id="listtask_container">
+                <form id="addform" onSubmit={this.handleAddSubmit}>
                     <div id="addbtn" onClick={this.handleAddSubmit}></div>
                     <input type="text" name="title" tabIndex="-1" onChange={this.handleAddTitleChange} value={this.state.title}></input>
                 </form>

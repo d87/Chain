@@ -281,7 +281,8 @@ const Schedule = ({ tasks }) => {
         position: "relative"
     }
     return (
-        <div style={{ position: "absolute", left: 100, top: 20 }}>
+        // style={{ position: "absolute", left: 100, top: 20 }}
+        <div className="col-xs-12 col-sm-4">
             <div style={ blockStyle }>
                 
                 {lines.map(index =>

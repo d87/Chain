@@ -185,7 +185,7 @@ class Tasks extends Component {
         const { tasks } = this.props
 
         return (
-            <div className="row">
+            <div className="col-xs-12 col-sm-4">
                 {tasks.map(task =>
                     <div key={task.id}>
                         <Task {...task}/>

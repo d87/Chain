@@ -369,16 +369,6 @@ def water_level():
         return json_response("ok", ud.as_dict(), 200)
 
 
-@app.route('/api/listtask/add', methods=['GET', 'POST'])
-def listtask_add():
-    if request.method == 'POST':
-        title = request.form['title']
-        lt = ListTask()
-        lt.title = title
-        db.session.add(lt)
-        db.session.commit()
-
-        return json_response("ok", lt.as_dict(), 201)
 
 @app.route('/api/listtask/list', methods=['GET'])
 def listtask_list():
@@ -420,10 +410,25 @@ def listtask_delete(ltid):
         return json_response("ok", None, 200)
 
 
+# @app.route('/api/listtask/add', methods=['GET', 'POST'])
+# def listtask_add():
+#     if request.method == 'POST':
+#         title = request.form['title']
+#         lt = ListTask()
+#         lt.title = title
+#         db.session.add(lt)
+#         db.session.commit()
+
+#         return json_response("ok", lt.as_dict(), 201)
+
+@app.route('/api/listtask/add', methods=['GET', 'POST'])
 @app.route('/api/listtask/<int:ltid>/edit', methods=['GET', 'POST'])
-def listtask_edit(ltid):
+def listtask_edit(ltid=None):
     if request.method == 'POST':
-        lt = ListTask.query.get(ltid)
+        if ltid == None: #when adding
+            lt = ListTask()
+        else:
+            lt = ListTask.query.get(ltid)
 
         if request.form["priority"]:
             new_priority = int(request.form["priority"])
@@ -439,6 +444,9 @@ def listtask_edit(ltid):
 
         if request.form["color"]:
             lt.color = request.form["color"] or ""
+
+        if ltid == None:
+            db.session.add(lt)
 
         db.session.commit()
 

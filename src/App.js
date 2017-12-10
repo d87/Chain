@@ -112,9 +112,11 @@ class TasksApp extends Component {
         return (
             <div className="container App">
                 <SoundPlayer/>
-                <Schedule/>
-                <Tasks/>
-                <TodoList/>
+                <div className="row">
+                    <Schedule/>
+                    <Tasks/>
+                    <TodoList/>
+                </div>
             </div>
         );
     }

@@ -22,11 +22,11 @@ const todoEdit = (id) => {
     }
 }
 
-const todoSaveClient = (id, newData) => {
+const todoSaveClient = (id, serverData) => {
     return {
         type: "TODO_SAVE",
         id: id,
-        newData: newData
+        serverData: serverData
     }
 }
 
@@ -47,6 +47,7 @@ const todoSaveError = (id) => {
 // Components
 
 const todoSave = (id, newData) => {
+    console.log("calling todoSave",id,newData)
     if (id === null)
         return (dispatch) => {
             const data = new FormData();
@@ -59,8 +60,8 @@ const todoSave = (id, newData) => {
                 .then(response => {
                     if(response.ok) {
                         response.json().then(data => {
-                            const todoServerData = data.data
-                            dispatch(todoSaveClient(todoServerData))
+                            const serverData = data.data
+                            dispatch(todoSaveClient(null, serverData))
                         })
                     } else {
                         dispatch(todoSaveError(id))
@@ -79,7 +80,10 @@ const todoSave = (id, newData) => {
             return fetch("/api/listtask/"+id+"/edit", reqInit)
                 .then(response => {
                     if(response.ok) {
-                        dispatch(todoSaveClient(id, newData))
+                        response.json().then(data => {
+                            const serverData = data.data
+                            dispatch(todoSaveClient(id, serverData))
+                        })
                     } else {
                         dispatch(todoSaveError(id))
                     }
@@ -89,7 +93,7 @@ const todoSave = (id, newData) => {
 
 const todoDeleteClient = (id) => {
     return {
-        type: 'DELETE',
+        type: 'TODO_DELETE',
         id: id
     }
 }
