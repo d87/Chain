@@ -1,4 +1,5 @@
 import time as timelib
+import urllib
 from flask import Flask
 from flask import render_template
 from flask import jsonify
@@ -9,17 +10,12 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime, timedelta, time
 from flask_admin import Admin, BaseView, expose #flask-admin
 from flask_admin.contrib.sqla import ModelView
+from tasks import app as celery_app
+
+from keys import TELEGRAM_BOT_URL
+# from keys import SECRET_KEY
 
 import json
-
-
-# deps so far:
-# dev-python/markdown
-# flask-admin
-# flask-sqlalchemy
-# wtforms
-# flask-wtf
-
 
 
 app = Flask(__name__)
@@ -29,9 +25,11 @@ assets = json.load(open(app.root_path+"/build/asset-manifest.json"))
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://django@localhost/whiplash"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:////tmp/test.db"
-app.config['SECRET_KEY'] = 'change-that'
+app.config['SECRET_KEY'] = "change-that"
 app.config['CSRF_ENABLED'] = True
 app.config['DEBUG'] = True
+
+
 
 # import logging
 # from logging import getLogger
@@ -102,9 +100,6 @@ class ListTask(db.Model):
     def description_markdown(self):
         return Markup(markdown(self.description, extensions=['markdown.extensions.tables']))
 
-    # def __init__(self, title=None):
-    #     self.title = title
-
     def __repr__(self):
         return '<ListTask %r>' % (self.title)
 
@@ -164,7 +159,6 @@ class Task(db.Model):
     pomo_completed = db.Column(db.Integer, default=0)
     pomo_state = db.Column(db.Unicode(12), default=u"INACTIVE")
     color = db.Column(db.Unicode(7), default=u"#33bb33")
-    # excuses = relationship("Excuse", back_populates="task")
     # mask = x < daynum
     # repeat & mask
 
@@ -183,11 +177,6 @@ class Task(db.Model):
             "color": self.color
         }
         return resp
-        # if cmd:
-            # resp['cmd'] = cmd
-            # if params:
-                # resp['params'] = params
-        # return jsonify(resp)
 
     def reset(self):
         self.task_time = 0
@@ -203,9 +192,6 @@ class Task(db.Model):
         if self.task_time >= self.task_length:
             self.task_time = self.task_length
             self.task_state = "COMPLETED"
-            # return self.ok_response("completed")
-            
-        # return self.ok_response("inc_task_time", v)
 
     def __init__(self, title="No Title", duration=5):
         self.title = title
@@ -216,12 +202,6 @@ class Task(db.Model):
         progress = int((float(self.task_time)/self.task_length)*100)
         return '<Task %r - %d%%>' % (self.title, progress)
 
-
-# class Excuse(db.Model):
-#     __tablename__ = 'excuses'
-#     id = db.Column(db.Integer, primary_key=True)
-#     task_id = Column(Integer, ForeignKey('tasks.id'))
-#     task = relationship("Task", back_populates="excuses")
 
 
 #flask-admin setup
@@ -293,12 +273,7 @@ def tasks():
     d2 = today + timedelta(days=3)
     days_query = Day.query.filter(Day.date >= d1).filter(Day.date < d2).order_by(Day.date).all()
     ud = UserData.query.all()[0]
-    # ud = UserData.query.get(1)
-    # if not ud:
-    #     ud = UserData()
-    #     ud.day_start_date = datetime.utcnow()
-    #     db.session.add(ud)
-    #     db.session.commit()
+
     return render_template("home_react.html",
                     bundle_js=assets["main.js"],
                     bundle_css=assets["main.css"],
@@ -519,7 +494,6 @@ def event_stream():
 
 @app.route('/stream')
 def stream():
-    print("stream entered")
     return Response(event_stream(),
                           mimetype="text/event-stream")
 
@@ -550,6 +524,20 @@ def post():
 
     connection.close()
 
+    return "OK", 200
+
+
+@app.route("/notify", methods=['POST'])
+def notify():
+    notification_text = request.form['body']
+
+    api_call_params = {
+        'chat_id': 92475549,
+        'text': notification_text
+    }
+
+    params = urllib.urlencode(api_call_params)
+    urllib.urlopen(TELEGRAM_BOT_URL,  params.encode('utf-8'))
     return "OK", 200
 
 
@@ -679,4 +667,3 @@ def tasks_rainmeter():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
-    # app.run(host='nevihta.d87')

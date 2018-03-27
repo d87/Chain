@@ -158,7 +158,7 @@ const TaskFieldAlt = ({ startTime, duration, color, title }) => {
         // opacity: 0.1,
         backgroundColor: mulColor(color, 0.4),
         borderTopWidth: "2px",
-        borderBottomWidth: "2px",
+        borderBottomWidth: 0,
         borderLeftWidth: 0,
         borderRightWidth: 0,
         borderStyle: "solid",
@@ -176,7 +176,7 @@ const TaskFieldAlt = ({ startTime, duration, color, title }) => {
                     </pattern>
                 </defs>
                 
-                <rect width={width} height={height-4} fill="url(#hatchPattern)"/>
+                <rect width={width} height={height-3} fill="url(#hatchPattern)"/>
             </svg>
             <span style={{ padding: 5, color: color, textAlign: "center", fontWeight: "bold", width: "100%", position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)" }}>{title}</span>
         </div>
@@ -241,7 +241,7 @@ class Timeline extends Component {
         }
         const delta = (date - dayStart)/1000
 
-        const dayDuration = 20*3600
+        const dayDuration = 19.5*3600
 
         let p = delta/dayDuration
         

@@ -45,27 +45,28 @@ const store = createStore(
 )
 
 
-// class AggregatedEventSource extends Component {
-//     constructor(url) {
-//         super();
+// class EventSource extends Component {
+//     constructor(props) {
+//         super(props);
 
-//         this.source = new EventSource(url);
-//         this.state = {};
-
-//         this.source.addEventListener('row', (event) => {
-//             const payload = JSON.parse(event.data);
-//             if (payload.new_val) { // added or updated
-//                 this.state[payload.new_val.id] = payload.new_val;
-//             } else { // deleted
-//                 delete this.state[payload.old_val.id];
+//         this.source = new EventSource(props.url);
+//         // this.state = {};
+//         this.handlers = {
+//             TASK_START: function(){
+//                 console.log("task start")
 //             }
+//         }
 
-//             this.onNext(this.collection());
-//         });
+//         this.handleRemoteEvent = this.handleRemoteEvent.bind(this)
+
+//         this.source.addEventListener('REMOTE_EVENT', this.handleRemoteEvent) ;
 //     }
 
-//     collection() {
-//         return Object.keys(this.state).map(key => this.state[key]);
+//     handleRemoteEvent(e) {
+//         console.log(e.event)
+//         // console.log(e.data)
+//         const data = JSON.parse(e.data)
+//         console.log(data)
 //     }
 // }
 
@@ -111,6 +112,7 @@ class TasksApp extends Component {
     render() {
         return (
             <div className="container App">
+                {/* <EventSource url={"/sse/stream"} /> */}
                 <SoundPlayer/>
                 <div className="row">
                     <Schedule/>

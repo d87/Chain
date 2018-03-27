@@ -127,9 +127,9 @@ class TodoList extends Component {
 
     handleAddSubmit(event) {
         event.preventDefault();
+        this.setState({ title: "" })
         // if (this.state.title !== "")
-        console.log("add submit")
-            return this.props.onAddClick(this.state.title)
+        return this.props.onAddClick(this.state.title)
     }
 
     handleAddTitleChange(event) {
