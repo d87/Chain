@@ -37,7 +37,7 @@ const taskResetClient = (id) => {
 const taskReset = (id) => {
     return (dispatch) => {
         const reqInit = { method: "POST" }
-        return fetch("/api/task/"+id+"/reset", reqInit)
+        return fetch("/api/schedule_tasks/"+id+"/reset", reqInit)
             .then(response => {
                 if(response.ok) {
                     dispatch(taskResetClient(id))
@@ -63,7 +63,7 @@ const taskSync = (id, newTime) => {
         const data = new FormData();
         data.append( "new_time", newTime )
         const reqInit = { method: "POST", body: data }
-        return fetch("/api/task/"+id+"/sync", reqInit)
+        return fetch("/api/schedule_tasks/"+id+"/sync", reqInit)
             .then(response => {
                 if(response.ok) {
                     dispatch(taskSyncClient(id, newTime))
@@ -91,7 +91,7 @@ const pomoStopClient = (id) => {
 const pomoCompleteAndBreak = (id) => {
     return (dispatch) => {
         const reqInit = { method: "POST" }
-        return fetch("/api/task/"+id+"/pomo_complete", reqInit)
+        return fetch("/api/schedule_tasks/"+id+"/pomo_complete", reqInit)
             .then(response => {
                 if(response.ok) {
                     dispatch(pomoStopClient(id))

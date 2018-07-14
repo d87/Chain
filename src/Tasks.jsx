@@ -139,7 +139,7 @@ class Tasks extends Component {
     }
 
     componentDidMount() {
-        fetch("/api/tasks/list").then( (response, body) => {
+        fetch("/api/schedule_tasks").then( (response, body) => {
 
             if(response.ok) {
                 response.json().then(data => {
@@ -157,11 +157,8 @@ class Tasks extends Component {
                         jstask.pomoLength = task.pomo_length
                         jstask.pomoBreakLength = task.pomo_break_length
                         jstask.color = task.color
-                        var hms = task.task_start_time
-                        var a = hms.split(':'); // split it at the colons
 
-                        var seconds = (+a[0]) * 60 * 60 + (+a[1]) * 60 + (+a[2]); 
-                        jstask.suggestedStartTime = seconds
+                        jstask.suggestedStartTime = task.task_start_time
                         // jstask.pomoState = task.pomoState
 
                         // just setting defaults

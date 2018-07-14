@@ -56,7 +56,7 @@ const todoSave = (id, newData) => {
             data.append( "priority", newData.priority )
             data.append( "color", newData.color )
             const reqInit = { method: "POST", body: data }
-            return fetch("/api/listtask/add", reqInit)
+            return fetch("/api/todos", reqInit)
                 .then(response => {
                     if(response.ok) {
                         response.json().then(data => {
@@ -75,9 +75,9 @@ const todoSave = (id, newData) => {
             data.append( "title", newData.title )
             data.append( "priority", newData.priority )
             data.append( "color", newData.color )
-            const reqInit = { method: "POST", body: data }
+            const reqInit = { method: "PUT", body: data }
 
-            return fetch("/api/listtask/"+id+"/edit", reqInit)
+            return fetch("/api/todos/"+id, reqInit)
                 .then(response => {
                     if(response.ok) {
                         response.json().then(data => {
@@ -101,9 +101,9 @@ const todoDeleteClient = (id) => {
 const todoDelete = (id) => {
     return (dispatch) => {
             const data = new FormData();
-            const reqInit = { method: "POST", body: data }
+            const reqInit = { method: "DELETE", body: data }
 
-            return fetch("/api/listtask/"+id+"/delete", reqInit)
+            return fetch("/api/todos/"+id, reqInit)
                 .then(response => {
                     if(response.ok) {
                         dispatch(todoDeleteClient(id))
@@ -265,14 +265,14 @@ class ProgressBar extends Component {
 }
 
 
-// const Todo = ({ id, description_raw, priority, title, onExpand, ...props }) => {
+// const Todo = ({ id, description, priority, title, onExpand, ...props }) => {
 class Todo extends Component {
     constructor(props) {
         super(props);
         this.dispatch = this.props.dispatch
         this.state = {
             title: props.title,
-            body: props.description_raw,
+            body: props.description,
             priority: props.priority,
             color: props.color
         };
@@ -308,7 +308,7 @@ class Todo extends Component {
     }
 
     render() {
-        const { id, description_raw, priority, title } = this.props
+        const { id, description, priority, title } = this.props
         const { isExpanded, isEditing, color } = this.props
         const { onExpand, onEditClick, onDelete } = this.props
 
@@ -357,7 +357,7 @@ class Todo extends Component {
                             </div>
                         ) : (
                             <div className="descpanel">
-                                <MarkdownView source={ description_raw }/>
+                                <MarkdownView source={ description }/>
                             </div>
                         )}
                     </div>

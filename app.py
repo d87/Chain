@@ -8,9 +8,16 @@ from flask import Response
 # from database import db.session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime, timedelta, time
-from flask_admin import Admin, BaseView, expose #flask-admin
-from flask_admin.contrib.sqla import ModelView
+from flask_admin import Admin, BaseView, expose
+# from flask_admin.contrib.sqla import ModelView
+from flask_admin.contrib.mongoengine import ModelView
 from tasks import app as celery_app
+
+import types
+from flask_restful import Resource, Api
+from flask_restful import fields, marshal_with, marshal_with_field
+from flask_mongoengine import MongoEngine
+
 
 from keys import TELEGRAM_BOT_URL
 # from keys import SECRET_KEY
@@ -20,6 +27,8 @@ import json
 
 app = Flask(__name__)
 
+api = Api(app)
+
 assets = json.load(open(app.root_path+"/build/asset-manifest.json"))
 
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://django@localhost/whiplash"
@@ -28,8 +37,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = "change-that"
 app.config['CSRF_ENABLED'] = True
 app.config['DEBUG'] = True
-
-
+app.config['MONGODB_HOST'] = 'mongodb://localhost/whiplash'
+app.config['MONGODB_PORT'] = 27017
+# app.config['MONGODB_USERNAME'] = 'username'
+# app.config['MONGODB_PASSWORD'] = 'password'
 
 # import logging
 # from logging import getLogger
@@ -38,145 +49,64 @@ app.config['DEBUG'] = True
 # app.logger.addHandler(file_handler)
 # getLogger('sqlalchemy').addHandler(file_handler)
 
-db = SQLAlchemy(app)
+db = MongoEngine()
+db.init_app(app)
 
-#------------------------
-# Models
-#------------------------
-from markdown import markdown
-from flask import Markup
-
-class UserData(db.Model):
-    __tablename__ = 'userdata'
-    id = db.Column(db.Integer, primary_key=True)
-    day_start_date = db.Column(db.DateTime)
-    water_level = db.Column(db.Float, default=0)
-
-    def __repr__(self):
-        return self.date.strftime("%x")
-
-    def as_dict(self, markup=True):
-        return {
-            "id" : self.id,
-            "day_start_date" :  self.day_start_date.strftime("%s"),
-            "water_level" : self.water_level
-        }
-
-class Day(db.Model):
-    __tablename__ = 'days'
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date)
-    state = db.Column(db.Unicode(15), default=u"MISSED")   #gotta try enums sometime
-    report = db.Column(db.UnicodeText, default=u"")
-
-    def __repr__(self):
-        return self.date.strftime("%x")
-
-    def as_dict(self, markup=True):
-        return {
-            "id" : self.id,
-            "date" : self.date.isoformat(),
-            "state" : self.state,
-            "report" : self.report,
-        }
+# db = SQLAlchemy(app)
 
 
-class ListTask(db.Model):
-    __tablename__ = 'listtasks'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.Unicode(100))
-    description = db.Column(db.UnicodeText, default=u"")
-    priority = db.Column(db.Integer, default = 50)
-    state = db.Column(db.Unicode(10), default = u"ACTIVE")
-    color = db.Column(db.Unicode(8), default = u"")
 
-    created_date = db.Column(db.DateTime, default=datetime.utcnow())
-    is_time_limited = db.Column(db.Boolean, default = False)
-    expiration_date = db.Column(db.DateTime, default=datetime.utcnow())
+class Todo(db.Document):
+    title = db.StringField(required=True, max_length=100)
+    description = db.StringField(default=u"")
+    priority = db.IntField(default=50)
+    state = db.StringField(max_length=20, default=u"ACTIVE")
+    color = db.StringField(max_length=8, default=u"")
 
-    use_markup = db.Column(db.Boolean, default = False)
+    created_date = db.DateTimeField(default = datetime.utcnow())
+    is_time_limited = db.BooleanField(default = False)
+    expiration_date = db.DateTimeField(default = datetime.utcnow())
 
-    @property
-    def description_markdown(self):
-        return Markup(markdown(self.description, extensions=['markdown.extensions.tables']))
+    # <Todo>.to_json(sort_keys=True, indent=4)
 
     def __repr__(self):
         return '<ListTask %r>' % (self.title)
 
-    def as_dict(self, markup=True):
-        obj = {
-            "id" : self.id,
-            "title" : self.title,
-            "description" : self.description_markdown,
-            "description_raw" : self.description,
-            "priority" : self.priority,
-            "state" : self.state,
-            "color" : self.color,
-            "created_date" : self.created_date.isoformat(),
-            "is_time_limited" : self.is_time_limited,
-            "expiration_date" : self.expiration_date.isoformat()
-        }
-        if not markup:
-            obj["description_body"] = self.description
-        return obj
+    def merge_form(self, form):
+        if form["priority"]:
+            new_priority = int(float(form["priority"]))
+            new_priority = min(new_priority, 100)
+            new_priority = max(new_priority, 0)
+            self.priority = new_priority
+
+        if form["descbody"]:
+            self.description = form["descbody"]
+
+        if form["title"]:
+            self.title = form["title"]
+
+        if form["color"]:
+            self.color = form["color"] or ""
 
 
-class JournalEntry(db.Model):
-    __tablename__ = 'journal'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.Unicode(100))
-    text = db.Column(db.UnicodeText, default=u"")
-    rating = db.Column(db.Integer, default=5)
+class ScheduleTask(db.Document):
+    title = db.StringField(required=True, max_length=120)
+    task_start_time = db.IntField(default=0)
+    task_length = db.IntField(default=3600)
+    task_time = db.IntField(default=0)
+    task_state = db.StringField(max_length=20, default = u"INACTIVE")
 
-    created_date = db.Column(db.DateTime, default=datetime.utcnow())
-    edited_date = db.Column(db.DateTime)
+    pomo_time = db.IntField(default=0)
+    pomo_length = db.IntField(default=25*60)
+    pomo_break_length = db.IntField(default=5*60)
+    pomo_completed = db.IntField(default=0)
+    pomo_state = db.StringField(max_length=20, default = u"INACTIVE")
+
+    color = db.StringField(max_length=8, default=u"")
 
     def __repr__(self):
-        return '<JournalEntry %r>' % (self.text[:10])
-
-    def as_dict(self):
-        return {
-            "id" : self.id,
-            "text" : self.text,
-            "rating" : self.rating,
-            "created_date" : self.created_date.isoformat(),
-            "edited_date" : self.created_date.isoformat(),
-        }
-
-
-
-class Task(db.Model):
-    __tablename__ = 'tasks'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.Unicode(120))
-    task_start_time = db.Column(db.Time,default=time(0))
-    task_length = db.Column(db.Integer)
-    task_time = db.Column(db.Integer,default=0)
-    task_state = db.Column(db.Unicode(12), default=u"INACTIVE")
-    pomo_time = db.Column(db.Integer,default=0)
-    pomo_length = db.Column(db.Integer, default=25*60)
-    pomo_break_length = db.Column(db.Integer, default=5*60)
-    pomo_completed = db.Column(db.Integer, default=0)
-    pomo_state = db.Column(db.Unicode(12), default=u"INACTIVE")
-    color = db.Column(db.Unicode(7), default=u"#33bb33")
-    # mask = x < daynum
-    # repeat & mask
-
-    def as_dict(self, cmd=None, params=None):
-        resp = {
-            "id": self.id,
-            "title": self.title,
-            "task_start_time": self.task_start_time.isoformat(),
-            "task_state": self.task_state,
-            "task_length": self.task_length,
-            "task_time": self.task_time,
-            "pomo_state": self.pomo_state,
-            "pomo_time": self.pomo_time,
-            "pomo_length": self.pomo_length,
-            "pomo_break_length": self.pomo_break_length,
-            "color": self.color
-        }
-        return resp
+        progress = int((float(self.task_time)/self.task_length)*100)
+        return '<ScheduleTask %r - %d%%>' % (self.title, progress)
 
     def reset(self):
         self.task_time = 0
@@ -185,33 +115,199 @@ class Task(db.Model):
         self.pomo_state = "INACTIVE"
         self.pomo_completed = 0
 
-        # return self.ok_response("reset")
-
     def add_time(self, v):
         self.task_time += v
         if self.task_time >= self.task_length:
             self.task_time = self.task_length
             self.task_state = "COMPLETED"
 
-    def __init__(self, title="No Title", duration=5):
-        self.title = title
-        self.task_length = duration*60
+
+# decorator for flask-restful
+def api_route(self, *args, **kwargs):
+    def wrapper(cls):
+        self.add_resource(cls, *args, **kwargs)
+        return cls
+    return wrapper
+
+api.route = types.MethodType(api_route, api)
 
 
-    def __repr__(self):
-        progress = int((float(self.task_time)/self.task_length)*100)
-        return '<Task %r - %d%%>' % (self.title, progress)
+
+def statusWrap(data):
+    return {
+        'status': fields.String,
+        'data': fields.Nested(data)
+    }
+
+def jsend(status, data=None, error_msg=None):
+    r = {
+        "status": status,
+        "data": data
+    }
+    if error_msg:
+        r["message"] = error_msg
+    return r
+
+
+
+todo_fields = statusWrap({
+    'id': fields.String,
+    'title': fields.String,
+    'description': fields.String,
+    'priority': fields.Integer,
+    'state': fields.String,
+    'color': fields.String,
+    
+    'created_date': fields.DateTime(dt_format='iso8601'),
+    'is_time_limited': fields.Boolean,
+    'expiration_date': fields.DateTime(dt_format='iso8601')
+})
+# todo_list_fields = statusWrap({
+    # fields.List(fields.Nested(todo_fields)),
+# })
+
+
+@api.route('/api/todos/<string:todo_id>')
+class TodoAPI(Resource):
+    @marshal_with(todo_fields)
+    def get(self, todo_id):
+        todo = Todo.objects.get(id=todo_id)
+        return jsend("success", todo)
+
+    @marshal_with(todo_fields)
+    def put(self, todo_id):
+        todo = Todo.objects.get(id=todo_id)
+        todo.merge_form(request.form)
+        todo.save()
+        return jsend("success", todo)
+
+    def delete(self, todo_id):
+        todo = Todo.objects.get(id=todo_id)
+        if todo:
+            todo.delete()
+
+        return jsend("success")
+
+@api.route('/api/todos')
+class TodoRootAPI(Resource):
+    @marshal_with(todo_fields)
+    def get(self):
+        todos = list(Todo.objects.all())
+        # flask-restful doesn't marshal on querysets apparently
+        return jsend("success", todos)
+
+    @marshal_with(todo_fields)
+    def post(self):
+        todo = Todo()
+        todo.merge_form(request.form)
+        todo.save()
+        return jsend("success", todo)
+
+
+
+
+schedule_fields = statusWrap({
+    'id': fields.String,
+    'title': fields.String,
+    'task_start_time': fields.Integer,
+    'task_length': fields.Integer,
+    'task_time': fields.Integer,
+    'task_state': fields.String,
+
+    'pomo_time': fields.Integer,
+    'pomo_length': fields.Integer,
+    'pomo_break_length': fields.Integer,
+    'pomo_completed': fields.Integer,
+    'pomo_state': fields.String,
+
+    'color': fields.String,
+})
+
+@api.route('/api/schedule_tasks/<string:task_id>')
+class ScheduleTaskAPI(Resource):
+    @marshal_with(schedule_fields)
+    def get(self, task_id):
+        task = ScheduleTask.objects.get(id=task_id)
+        return jsend("success", task)
+
+
+@api.route('/api/schedule_tasks')
+class ScheduleTaskRootAPI(Resource):
+    @marshal_with(schedule_fields)
+    def get(self):
+        tasks = list(ScheduleTask.objects.all())
+        return jsend("success", tasks)
+
+
+@api.route('/api/schedule_tasks/<string:task_id>/sync')
+class ScheduleTaskSyncCommand(Resource):
+    @marshal_with(schedule_fields)
+    def post(self, task_id):
+        new_time = int(request.form['new_time'])
+
+        task = ScheduleTask.objects.get(id=task_id)
+
+        task.task_time = new_time
+        if task.task_time >= task.task_length:
+            task.task_time = task.task_length
+            task.task_state = "COMPLETED"
+
+        task.save()
+
+        return jsend("success", task)
+
+
+@api.route('/api/schedule_tasks/<string:task_id>/reset')
+class ScheduleTaskResetCommand(Resource):
+    @marshal_with(schedule_fields)
+    def post(self, task_id):
+        task = ScheduleTask.objects.get(id=task_id)
+        task.reset()
+        task.save()
+        return jsend("success", task)
+
+
+@api.route('/api/schedule_tasks/<string:task_id>/pomo_complete')
+class ScheduleTaskPomoCompleteCommand(Resource):
+    @marshal_with(schedule_fields)
+    def post(self, task_id):
+        task = ScheduleTask.objects.get(id=task_id)
+        task.task_time = task.task_time + task.pomo_length
+        if task.task_time >= task.task_length:
+            task.task_time = task.task_length
+            task.task_state = "COMPLETED"
+
+        task.save()
+        return jsend("success", task)
+    
+# class Day(db.Model):
+#     __tablename__ = 'days'
+#     id = db.Column(db.Integer, primary_key=True)
+#     date = db.Column(db.Date)
+#     state = db.Column(db.Unicode(15), default=u"MISSED")   #gotta try enums sometime
+#     report = db.Column(db.UnicodeText, default=u"")
+
+#     def __repr__(self):
+#         return self.date.strftime("%x")
+
+#     def as_dict(self, markup=True):
+#         return {
+#             "id" : self.id,
+#             "date" : self.date.isoformat(),
+#             "state" : self.state,
+#             "report" : self.report,
+#         }
 
 
 
 #flask-admin setup
 
 admin = Admin(app)
-admin.add_view(ModelView(UserData, db.session))
-admin.add_view(ModelView(Task, db.session))
-admin.add_view(ModelView(ListTask, db.session))
-admin.add_view(ModelView(Day, db.session))
-admin.add_view(ModelView(JournalEntry, db.session))
+admin.add_view(ModelView(Todo))
+admin.add_view(ModelView(ScheduleTask))
+# admin.add_view(ModelView(UserData, db.session))
+# admin.add_view(ModelView(Day, db.session))
+# admin.add_view(ModelView(JournalEntry, db.session))
 
 
 #------------------------
@@ -266,208 +362,66 @@ def dayrange(start, end, query=[], fill_in_blanks=False):
 
 @app.route('/')
 def tasks():
-    tasks = Task.query.all()
-    listtasks = ListTask.query.all()
-    today = date.today()
-    d1 = today - timedelta(days=3)
-    d2 = today + timedelta(days=3)
-    days_query = Day.query.filter(Day.date >= d1).filter(Day.date < d2).order_by(Day.date).all()
-    ud = UserData.query.all()[0]
+    todos = Todo.objects.all()
+    schedule_tasks = ScheduleTask.objects.all()
+    # tasks = Task.query.all()
+    # listtasks = ListTask.query.all()
+    # today = date.today()
+    # d1 = today - timedelta(days=3)
+    # d2 = today + timedelta(days=3)
+    # days_query = Day.query.filter(Day.date >= d1).filter(Day.date < d2).order_by(Day.date).all()
+    # ud = UserData.query.all()[0]
 
     return render_template("home_react.html",
                     bundle_js=assets["main.js"],
                     bundle_css=assets["main.css"],
-                    tasks=tasks,
-                    listtasks=listtasks,
-                    days=dayrange(d1, d2, query=days_query),
-                    userdata=ud
+                    tasks=schedule_tasks,
+                    listtasks=todos,
+                    # days=dayrange(d1, d2, query=days_query),
+                    # userdata=ud
                     # day_start_date=us
                     )
 
 
-@app.route('/api/day/<datestr>/', methods=['GET', 'POST'])
-def day_state(datestr):
-    if request.method == 'POST':
-        date = datetime.strptime(datestr, "%Y-%m-%d").date()
-        day = Day.query.filter(Day.date == date).first()
-        if not day:
-            day = Day()
-            day.date = date
-            db.session.add(day)
-
-        newstate = request.form['state']
-        day.state = newstate
-
-        db.session.commit()
-
-        return json_response("ok", day.as_dict(), 200)
-
-
-@app.route('/api/userdata/day_start', methods=['GET', 'POST'])
-def day_start():
-    if request.method == 'POST':
-        datetimestamp = int(float(request.form['day_start_date']))
-        date = datetime.fromtimestamp(datetimestamp)
-        # date = datetime.strptime(datestring, "%Y-%m-%dT%H:%M:%S.%fZ")
-        ud = UserData.query.all()[0]
-        ud.day_start_date = date
-        db.session.commit()
-
-        return json_response("ok", ud.as_dict(), 200)
-    else:
-        try:
-            ud = UserData.query.all()[0]
-        except IndexError:
-            ud = UserData()
-            ud.day_start_date = datetime.utcnow()
-            db.session.add(ud)
-            db.session.commit()
-        return json_response("ok", ud.as_dict(), 200)
-
-@app.route('/api/userdata/water_level', methods=['GET', 'POST'])
-def water_level():
-    if request.method == 'POST':
-        newwater = float(request.form['water_level'])
-        ud = UserData.query.all()[0]
-        ud.water_level = newwater
-        db.session.commit()
-
-        return json_response("ok", ud.as_dict(), 200)
-    else:
-        try:
-            ud = UserData.query.all()[0]
-        except IndexError:
-            ud = UserData()
-            ud.day_start_date = datetime.utcnow()
-            db.session.add(ud)
-            db.session.commit()
-        return json_response("ok", ud.as_dict(), 200)
-
-
-
-@app.route('/api/listtask/list', methods=['GET'])
-def listtask_list():
-    if request.method == 'GET':
-        ltasks = ListTask.query.all()
-        ltasks_dict = [ x.as_dict() for x in reversed(ltasks) ]
-
-        return json_response("ok", ltasks_dict, 201)
-
-
-@app.route('/api/listtask/<int:ltid>', methods=['GET', 'POST'])
-def listtask(ltid):
-    if request.method == 'POST':
-        lt = ListTask.query.get(ltid)
-
-        if request.form["priority"]:
-            new_priority = int(request.form["priority"])
-            if new_priority > 100:
-                new_priority = 100
-            if new_priority < 0:
-                new_priority = 0
-            lt.priority = new_priority
-
-        db.session.commit()
-
-        return json_response("ok", lt.as_dict(), 200)
-    else:
-        return json_response("ok", lt.as_dict(), 200)
-
-
-@app.route('/api/listtask/<int:ltid>/delete', methods=['GET', 'POST'])
-def listtask_delete(ltid):
-    if request.method == 'POST':
-        lt = ListTask.query.get(ltid)
-        if lt:
-            db.session.delete(lt)
-            db.session.commit()
-
-        return json_response("ok", None, 200)
-
-
-# @app.route('/api/listtask/add', methods=['GET', 'POST'])
-# def listtask_add():
+# @app.route('/api/day/<datestr>/', methods=['GET', 'POST'])
+# def day_state(datestr):
 #     if request.method == 'POST':
-#         title = request.form['title']
-#         lt = ListTask()
-#         lt.title = title
-#         db.session.add(lt)
+#         date = datetime.strptime(datestr, "%Y-%m-%d").date()
+#         day = Day.query.filter(Day.date == date).first()
+#         if not day:
+#             day = Day()
+#             day.date = date
+#             db.session.add(day)
+
+#         newstate = request.form['state']
+#         day.state = newstate
+
 #         db.session.commit()
 
-#         return json_response("ok", lt.as_dict(), 201)
-
-@app.route('/api/listtask/add', methods=['GET', 'POST'])
-@app.route('/api/listtask/<int:ltid>/edit', methods=['GET', 'POST'])
-def listtask_edit(ltid=None):
-    if request.method == 'POST':
-        if ltid == None: #when adding
-            lt = ListTask()
-        else:
-            lt = ListTask.query.get(ltid)
-
-        if request.form["priority"]:
-            new_priority = int(request.form["priority"])
-            new_priority = min(new_priority, 100)
-            new_priority = max(new_priority, 0)
-            lt.priority = new_priority
-
-        if request.form["descbody"]:
-            lt.description = request.form["descbody"]
-
-        if request.form["title"]:
-            lt.title = request.form["title"]
-
-        if request.form["color"]:
-            lt.color = request.form["color"] or ""
-
-        if ltid == None:
-            db.session.add(lt)
-
-        db.session.commit()
-
-        return json_response("ok", lt.as_dict(markup=True), 200)
-
-    if request.method == 'GET':
-        lt = ListTask.query.get(ltid)
-        return json_response("ok", lt.as_dict(markup=False), 200)
+#         return json_response("ok", day.as_dict(), 200)
 
 
+# @app.route('/api/userdata/day_start', methods=['GET', 'POST'])
+# def day_start():
+#     if request.method == 'POST':
+#         datetimestamp = int(float(request.form['day_start_date']))
+#         date = datetime.fromtimestamp(datetimestamp)
+#         # date = datetime.strptime(datestring, "%Y-%m-%dT%H:%M:%S.%fZ")
+#         ud = UserData.query.all()[0]
+#         ud.day_start_date = date
+#         db.session.commit()
 
-@app.route('/api/task/<int:task_id>/', methods=['GET', 'POST'])
-def taskjson(task_id):
-    if request.method == 'POST':
-        cmd = request.form['cmd']
-        value = request.form['value']
-        try:
-            v = int(value)
-        except:
-            v = value
+#         return json_response("ok", ud.as_dict(), 200)
+#     else:
+#         try:
+#             ud = UserData.query.all()[0]
+#         except IndexError:
+#             ud = UserData()
+#             ud.day_start_date = datetime.utcnow()
+#             db.session.add(ud)
+#             db.session.commit()
+#         return json_response("ok", ud.as_dict(), 200)
 
-        task = Task.query.filter(Task.id == task_id).first()
-
-        response = ""
-
-        # if hasattr(task,cmd):
-            # getattr(task,cmd)(key,val)
-
-        if cmd == "reset":
-            response = task.reset()
-        elif cmd == "add_time":
-            response = task.add_time(v)
-
-
-        db.session.commit()
-        return json_response("ok", task.as_dict())
-        # assert False
-    else:
-        task = Task.query.filter(Task.id == task_id).first()
-        return json_response("get", task.as_dict())
-
-
-## this is for plain SQLAlchemy
-# @app.teardown_appcontext
-# def shutdown_session(exception=None):
-#     db.session.remove()
 
 import pika
 
@@ -613,57 +567,12 @@ def journal():
     return render_template("journal.html")
 
 
+# @app.route('/api/tasks/rainmeter', methods=['GET'])
+# def tasks_rainmeter():
+#     if request.method == 'GET':
+#         tasks = Task.query.all()
 
-
-@app.route('/api/tasks/list', methods=['GET'])
-def tasks_api_list():
-    if request.method == 'GET':
-        tasks = Task.query.all()
-        tasks_dict = [ x.as_dict() for x in reversed(tasks) ]
-
-        return json_response("ok", tasks_dict, 201)
-
-@app.route('/api/task/<int:task_id>/sync', methods=['POST'])
-def tasks_api_sync(task_id):
-    if request.method == 'POST':
-        new_time = int(request.form['new_time'])
-
-        task = Task.query.filter(Task.id == task_id).first()
-
-        task.task_time = new_time
-        if task.task_time >= task.task_length:
-            task.task_time = task.task_length
-            task.task_state = "COMPLETED"
-
-        db.session.commit()
-        return json_response("ok", task.as_dict())
-
-@app.route('/api/task/<int:task_id>/pomo_complete', methods=['POST'])
-def tasks_api_pomo_complete(task_id):
-    if request.method == 'POST':
-        task = Task.query.filter(Task.id == task_id).first()
-        task.task_time = task.task_time + task.pomo_length
-        if task.task_time >= task.task_length:
-            task.task_time = task.task_length
-            task.task_state = "COMPLETED"
-
-        db.session.commit()
-        return json_response("ok", task.as_dict())
-
-@app.route('/api/task/<int:task_id>/reset', methods=['POST'])
-def tasks_api_reset(task_id):
-    if request.method == 'POST':
-        task = Task.query.filter(Task.id == task_id).first()
-        task.reset()
-        db.session.commit()
-        return json_response("ok", task.as_dict())
-
-@app.route('/api/tasks/rainmeter', methods=['GET'])
-def tasks_rainmeter():
-    if request.method == 'GET':
-        tasks = Task.query.all()
-
-        return render_template("rainmeter.html", tasks=tasks )
+#         return render_template("rainmeter.html", tasks=tasks )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')

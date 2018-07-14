@@ -46,7 +46,7 @@ const todoReducer = (state = [], action) => {
                     isExpanded: true,
                     title: action.title,
                     priority: 100,
-                    description_raw: "",
+                    description: "",
                     color: "",
                     state: "ACTIVE",
                     created_date: Date.now()
@@ -74,7 +74,7 @@ const todoReducer = (state = [], action) => {
                     return Object.assign({}, todo, {
                         id: action.serverData.id,
                         isEditing: false,
-                        description_raw: action.serverData.description_raw,
+                        description: action.serverData.description,
                         priority: action.serverData.priority,
                         color: action.serverData.color
                     });
@@ -138,7 +138,7 @@ class TodoList extends Component {
 
 
     componentDidMount() {
-        fetch("/api/listtask/list").then( (response, body) => {
+        fetch("/api/todos").then( (response, body) => {
 
             if(response.ok) {
                 response.json().then(data => {
